@@ -2,6 +2,7 @@ package dev.munky.modelrenderer.skeleton
 
 import kotlinx.serialization.StringFormat
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonBuilder
 import kotlinx.serialization.json.JsonNamingStrategy
 
 private val instance = Json {
