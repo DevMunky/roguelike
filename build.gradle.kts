@@ -4,3 +4,40 @@
  * This is a general purpose Gradle build.
  * To learn more about Gradle by exploring our Samples at https://docs.gradle.org/8.8/samples
  */
+plugins {
+    kotlin("jvm") version libs.versions.kotlin.get()
+    alias(libs.plugins.kotlinx.serialization) apply false
+    alias(libs.plugins.gradleup.shadow) apply false
+}
+
+group = "dev.munky"
+version = "0.0.1"
+
+allprojects {
+    apply(plugin = rootProject.libs.plugins.kotlin.get().pluginId)
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    group = rootProject.group
+    version = rootProject.version
+
+    apply(plugin = rootProject.libs.plugins.kotlinx.serialization.get().pluginId)
+    apply(plugin = rootProject.libs.plugins.gradleup.shadow.get().pluginId)
+
+    dependencies {
+        implementation(rootProject.libs.bundles.kotlinx.serialization)
+    }
+
+    val jdkVersion = 25
+    java.toolchain.languageVersion.set(JavaLanguageVersion.of(jdkVersion))
+    kotlin {
+        jvmToolchain(jdkVersion)
+        compilerOptions {
+            freeCompilerArgs.add("-opt-in=kotlinx.serialization.ExperimentalSerializationApi")
+        }
+    }
+}

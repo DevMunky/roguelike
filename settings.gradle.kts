@@ -13,4 +13,10 @@ dependencyResolutionManagement {
     }
 }
 
+val subProjects = listOf(
+    "common",
+    "modelrenderer"
+)
+include(*subProjects.toTypedArray())
+
 rootProject.name = "roguelike"
