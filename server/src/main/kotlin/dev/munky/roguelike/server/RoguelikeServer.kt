@@ -1,6 +1,6 @@
 package dev.munky.roguelike.server
 
-import dev.munky.modelrenderer.ModelRendererPlatform
+import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.helpCommand
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
@@ -10,8 +10,8 @@ class RoguelikeServer {
     lateinit var mc: MinecraftServer
     fun process() : ServerProcess = MinecraftServer.process()
 
-    private val modelPlatform = ModelRendererPlatform.platform()
-    fun model() : ModelRendererPlatform = modelPlatform
+    private val modelPlatform = ModelPlatform.register(MinestomModelPlatform())
+    fun model() : ModelPlatform = modelPlatform
 
     private val terminal = MinestomCommandTerminal()
     fun terminal() : MinestomCommandTerminal = terminal

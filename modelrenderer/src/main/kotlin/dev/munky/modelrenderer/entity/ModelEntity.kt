@@ -1,6 +1,6 @@
 package dev.munky.modelrenderer.entity
 
-import dev.munky.modelrenderer.ModelRendererPlatform
+import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.modelrenderer.skeleton.Animation
 import dev.munky.modelrenderer.skeleton.Bone
 import dev.munky.modelrenderer.skeleton.Cube
@@ -13,30 +13,41 @@ import java.util.UUID
 import kotlin.collections.filter
 import kotlin.time.Duration.Companion.milliseconds
 
-abstract class AbstractModelEntity(val model: Model) {
+class ModelEntity(
+    val model: Model
+) {
     var state: State = State.None
-        protected set
-    abstract var level: ModelRendererPlatform.Level
+        private set
     var scale: Float = 1f
-    val bones = model.bones.map { ModelEntityBone(it.value, this@AbstractModelEntity, null) }
-
-    protected abstract val position0: Vector3d
+    val bones = model.bones.map { ModelEntityBone(it.value, this@ModelEntity, null) }
+    var level : ModelPlatform.Level? = null
     var position: Vector3d = Vector3d(.0)
         set(value) {
             moveAll(value)
             field = value
         }
 
-    protected fun moveAll(to: Vector3d) {
+    private fun moveAll(to: Vector3d) {
         val mat = Matrix4d().translation(to)
         for (bone in bones) {
             bone.applyTransform(mat)
         }
     }
 
-    fun create() {
+    fun setLevel(level: ModelPlatform.Level) {
+        this.level = level
+    }
+
+    fun spawn() {
         for (bone in bones) {
+            bone.spawn()
             moveAll(position)
+        }
+    }
+
+    fun despawn() {
+        for (bone in bones) {
+            bone.despawn()
         }
     }
 }
@@ -51,16 +62,19 @@ sealed interface State {
      */
     data class PlayingAnimation(val animationId: UUID, val frame: Int) : State // Start playing animation : Lerping
     data object StoppingAnimation : State // Reset state entirely
-    class Compound(vararg val states: State) : State // Stop and start combined
+    class Compound(vararg val states: State) : State
     data object None : State
 }
 
 sealed class ModelPartEntity {
     abstract val uuid: UUID
     abstract val name: String
-    abstract val owner: AbstractModelEntity
+    abstract val owner: ModelEntity
     abstract val parent: ModelEntityBone?
     val id: String = (parent?.id ?: "") + name
+
+    open fun spawn() {}
+    open fun despawn() {}
 
     fun update(state: State): Unit = when(state) {
         is State.None, is State.StoppingAnimation -> applyTransform(Matrix4d())
@@ -109,7 +123,7 @@ sealed class ModelPartEntity {
  */
 class ModelEntityBone(
     val bone: Bone,
-    override val owner: AbstractModelEntity,
+    override val owner: ModelEntity,
     override val parent: ModelEntityBone?
 ) : ModelPartEntity() {
     override val uuid: UUID = bone.uuid
@@ -128,6 +142,15 @@ class ModelEntityBone(
         this.cubes = cubes
     }
 
+    override fun spawn() {
+        for (bone in bones.values) {
+            bone.spawn()
+        }
+        for (cube in cubes.values) {
+            cube.spawn()
+        }
+    }
+
     override fun applyTransform(mat: Matrix4dc) {
         for (bone in bones.values) {
             bone.applyTransform(mat)
@@ -143,18 +166,26 @@ class ModelEntityBone(
  */
 class CubeEntity(
     val cube: Cube,
-    override val owner: AbstractModelEntity,
+    override val owner: ModelEntity,
     override val parent: ModelEntityBone
 ) : ModelPartEntity() {
     override val uuid: UUID = cube.uuid
     override val name: String = cube.name
 
-    val entity = owner.level.spawnItemDisplay(cube.from.x,cube.from.y,cube.from.z, id)
+    var entity: ModelPlatform.ItemDisplayEntity? = null
+        private set
+
+    override fun spawn() {
+        val level = owner.level ?: error("ModelEntity has no level. Call ModelEntity.setLevel(ModelPlatform.Level) first.")
+        entity = level.spawnItemDisplay(cube.from.x,cube.from.y,cube.from.z, id)
+    }
+
     override fun applyTransform(mat: Matrix4dc) {
         val final = cube.transform.mul(mat, Matrix4d())
         val translate = final.getTranslation(Vector3d())
         val rotate = final.getUnnormalizedRotation(Quaterniond())
         val scale = final.getScale(Vector3d())
+        val entity = entity ?: error("ItemDisplayEntity not yet spawned. Call ModelEntity.spawn() first.")
         entity.move(translate)
         entity.scale(scale)
         entity.rotateRightHanded(rotate)

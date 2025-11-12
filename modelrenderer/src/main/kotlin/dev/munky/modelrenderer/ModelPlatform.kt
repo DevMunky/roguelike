@@ -1,13 +1,11 @@
 package dev.munky.modelrenderer
 
-import org.joml.Matrix4d
-import org.joml.Quaterniond
 import org.joml.Quaterniondc
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import java.util.UUID
 
-interface ModelRendererPlatform {
+interface ModelPlatform {
     fun levelOf(uuid: UUID) : Level
 
     interface ItemDisplayEntity {
@@ -22,13 +20,14 @@ interface ModelRendererPlatform {
     }
 
     companion object {
-        private var registeredPlatform: ModelRendererPlatform? = null
-        fun register(platform: ModelRendererPlatform) {
+        private var registeredPlatform: ModelPlatform? = null
+        fun register(platform: ModelPlatform) : ModelPlatform {
             if (registeredPlatform == null) error("A platform is already registered")
             registeredPlatform = platform
+            return platform
         }
-        fun platform() : ModelRendererPlatform {
-            return registeredPlatform ?: error("There is no registered platform. Register one with ${ModelRendererPlatform::class.qualifiedName}.register(Platform).")
+        fun platform() : ModelPlatform {
+            return registeredPlatform ?: error("There is no registered platform. Register one with ${ModelPlatform::class.qualifiedName}.register(Platform).")
         }
     }
 }

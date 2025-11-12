@@ -16,8 +16,10 @@ import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromStream
 import org.joml.Matrix4d
 import org.joml.Matrix4dc
+import java.io.InputStream
 
 typealias UUID = @Serializable(with = UUIDSerializer::class) java.util.UUID
 
@@ -102,6 +104,13 @@ data class Model(
         val modelFormat: String,
         val boxUv: Boolean,
     )
+
+    companion object {
+        @OptIn(ExperimentalSerializationApi::class)
+        fun decodeFromInputStream(stream: InputStream) : Model {
+            return BBModelJson.decodeFromStream(serializer(), stream)
+        }
+    }
 }
 
 interface ModelPart {
