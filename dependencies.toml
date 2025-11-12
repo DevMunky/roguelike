@@ -2,7 +2,7 @@
 # base
 kotlinx-serialization = "1.9.0"
 kotlinx-coroutines = "1.10.2"
-kotlin = "2.3.0-Beta2"
+kotlin = "2.3.0-Beta2" # Need JDK-25 support, only available from >2.3.0-Beta2
 
 # tooling
 gradleup-shadow = "9.2.2"
@@ -18,6 +18,7 @@ adventure = "4.20.0"
 joml = "1.10.5"
 
 # logging
+slf4j = "2.0.17"
 logback = "1.5.18"
 
 [libraries]
@@ -25,11 +26,12 @@ kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-protobuf = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-protobuf", version.ref = "kotlinx-serialization" }
 
-kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 
 minestom = { module = "net.minestom:minestom", version.ref = "minestom" }
 adventure-minimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "adventure" }
 
+slf4j = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j"  }
 logback-core = { group = "ch.qos.logback", name = "logback-core", version.ref = "logback" }
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 
@@ -39,6 +41,8 @@ polyglot-js = { module = "org.graalvm.polyglot:js", version.ref = "polyglot" }
 joml = { module = "org.joml:joml", version.ref = "joml"}
 
 [bundles]
+logback = ["logback-core", "logback-classic"]
+kotlinx-coroutines = ["kotlinx-coroutines-core"]
 kotlinx-serialization = ["kotlinx-serialization-core", "kotlinx-serialization-json", "kotlinx-serialization-protobuf"]
 polyglot = ["polyglot-core", "polyglot-js"]
 

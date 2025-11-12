@@ -15,6 +15,7 @@ dependencyResolutionManagement {
 
 val subProjects = listOf(
     "common",
+    "server",
     "modelrenderer"
 )
 include(*subProjects.toTypedArray())

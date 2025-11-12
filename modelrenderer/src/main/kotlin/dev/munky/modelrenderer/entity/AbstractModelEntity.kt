@@ -1,27 +1,107 @@
 package dev.munky.modelrenderer.entity
 
-import dev.munky.modelrenderer.ModelRendererPlatform.Companion.platform
+import dev.munky.modelrenderer.ModelRendererPlatform
+import dev.munky.modelrenderer.skeleton.Animation
 import dev.munky.modelrenderer.skeleton.Bone
 import dev.munky.modelrenderer.skeleton.Cube
 import dev.munky.modelrenderer.skeleton.Model
-import dev.munky.modelrenderer.util.Vec3d
+import org.joml.Matrix4d
+import org.joml.Matrix4dc
+import org.joml.Quaterniond
+import org.joml.Vector3d
 import java.util.UUID
+import kotlin.collections.filter
+import kotlin.time.Duration.Companion.milliseconds
 
 abstract class AbstractModelEntity(val model: Model) {
-    abstract var position: Vec3d
+    var state: State = State.None
+        protected set
+    abstract var level: ModelRendererPlatform.Level
     var scale: Float = 1f
     val bones = model.bones.map { ModelEntityBone(it.value, this@AbstractModelEntity, null) }
 
-    fun create(x: Double, y: Double, z: Double) {
+    protected abstract val position0: Vector3d
+    var position: Vector3d = Vector3d(.0)
+        set(value) {
+            moveAll(value)
+            field = value
+        }
 
+    protected fun moveAll(to: Vector3d) {
+        val mat = Matrix4d().translation(to)
+        for (bone in bones) {
+            bone.applyTransform(mat)
+        }
+    }
+
+    fun create() {
+        for (bone in bones) {
+            moveAll(position)
+        }
     }
 }
 
+/**
+ * State machine for a model in-game.
+ */
+sealed interface State {
+    /**
+     * Represents a currently playing animation. [frame] is the current
+     * frame in ticks that should be rendered during the tick this state is set.
+     */
+    data class PlayingAnimation(val animationId: UUID, val frame: Int) : State // Start playing animation : Lerping
+    data object StoppingAnimation : State // Reset state entirely
+    class Compound(vararg val states: State) : State // Stop and start combined
+    data object None : State
+}
+
 sealed class ModelPartEntity {
+    abstract val uuid: UUID
     abstract val name: String
     abstract val owner: AbstractModelEntity
     abstract val parent: ModelEntityBone?
     val id: String = (parent?.id ?: "") + name
+
+    fun update(state: State): Unit = when(state) {
+        is State.None, is State.StoppingAnimation -> applyTransform(Matrix4d())
+        is State.Compound -> for (s in state.states) update(s)
+        is State.PlayingAnimation -> when (this) {
+            is ModelEntityBone -> {
+                val anim = owner.model.animations[state.animationId]!! // should be valid when setting state machine
+                playAnimation(anim, state.frame)
+            }
+            else -> {}
+        }
+    }
+
+    fun playAnimation(animation: Animation, frame: Int) {
+        // No animator for this model part.
+        val animator = animation.animators[uuid] ?: return
+        val lastFrame = frame.coerceAtLeast(1) - 1
+        val minTime = animation.length * ((lastFrame * 50.0).milliseconds / animation.length)
+        val maxTime = animation.length * ((frame * 50.0).milliseconds / animation.length)
+        val keyframes = animator.keyframes.filter { it.time in minTime..maxTime }
+        val finalMat = Matrix4d()
+        for (keyframe in keyframes) {
+            for (data in keyframe.dataPoints) when (data) {
+                is Animation.Animator.KeyFrame.DataPoint.Vec3d -> when (keyframe.channel) {
+                    Animation.Animator.KeyFrame.Channel.SCALE -> finalMat.scale(data.x, data.y, data.z)
+                    Animation.Animator.KeyFrame.Channel.POSITION -> finalMat.translate(data.x, data.y, data.z)
+                    Animation.Animator.KeyFrame.Channel.ROTATION -> finalMat.rotateXYZ(data.x, data.y, data.z)
+                    else -> error("Unreachable ($keyframe)")
+                }
+                is Animation.Animator.KeyFrame.DataPoint.Sound -> {
+                    val modelOrigin = owner.position
+                    val translate = finalMat.getTranslation(Vector3d())
+                    val soundPos = modelOrigin.add(translate)
+                    owner.level.playSound(soundPos, data.effect)
+                }
+            }
+        }
+        applyTransform(finalMat)
+    }
+
+    abstract fun applyTransform(mat: Matrix4dc)
 }
 
 /**
@@ -32,6 +112,7 @@ class ModelEntityBone(
     override val owner: AbstractModelEntity,
     override val parent: ModelEntityBone?
 ) : ModelPartEntity() {
+    override val uuid: UUID = bone.uuid
     override val name: String = bone.name
     val bones: Map<UUID, ModelEntityBone>
     val cubes: Map<UUID, CubeEntity>
@@ -46,6 +127,15 @@ class ModelEntityBone(
         this.bones = bones
         this.cubes = cubes
     }
+
+    override fun applyTransform(mat: Matrix4dc) {
+        for (bone in bones.values) {
+            bone.applyTransform(mat)
+        }
+        for (cube in cubes.values) {
+            cube.applyTransform(mat)
+        }
+    }
 }
 
 /**
@@ -56,6 +146,17 @@ class CubeEntity(
     override val owner: AbstractModelEntity,
     override val parent: ModelEntityBone
 ) : ModelPartEntity() {
+    override val uuid: UUID = cube.uuid
     override val name: String = cube.name
-    val mc = platform().spawnItemDisplay(owner, id)
+
+    val entity = owner.level.spawnItemDisplay(cube.from.x,cube.from.y,cube.from.z, id)
+    override fun applyTransform(mat: Matrix4dc) {
+        val final = cube.transform.mul(mat, Matrix4d())
+        val translate = final.getTranslation(Vector3d())
+        val rotate = final.getUnnormalizedRotation(Quaterniond())
+        val scale = final.getScale(Vector3d())
+        entity.move(translate)
+        entity.scale(scale)
+        entity.rotateRightHanded(rotate)
+    }
 }

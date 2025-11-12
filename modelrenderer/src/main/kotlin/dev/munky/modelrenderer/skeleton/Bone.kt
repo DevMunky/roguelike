@@ -5,6 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import org.joml.Matrix4d
+import org.joml.Matrix4dc
 
 @Serializable
 data class Bone(
@@ -26,7 +27,7 @@ data class Bone(
         private set
 
     @Transient
-    override val transform: Matrix4d = Matrix4d().apply {
+    override val transform: Matrix4dc = Matrix4d().apply {
         translate(origin.x, origin.y, origin.z)
     }
 

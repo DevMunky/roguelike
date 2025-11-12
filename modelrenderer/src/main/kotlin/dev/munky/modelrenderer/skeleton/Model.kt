@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.joml.Matrix4d
+import org.joml.Matrix4dc
 
 typealias UUID = @Serializable(with = UUIDSerializer::class) java.util.UUID
 
@@ -106,7 +107,7 @@ data class Model(
 interface ModelPart {
     val name: String
     val uuid: UUID
-    val transform: Matrix4d
+    val transform: Matrix4dc
 }
 
 @Serializable(with = RawModelPart.Serializer::class)

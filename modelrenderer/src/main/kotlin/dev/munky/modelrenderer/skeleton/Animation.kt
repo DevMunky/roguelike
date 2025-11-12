@@ -7,6 +7,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Transient
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -23,6 +24,9 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.joml.Matrix4d
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 object EmptyStringAsZeroDoubleSerializer : KSerializer<Double> {
     override val descriptor: SerialDescriptor =
@@ -45,21 +49,26 @@ object EmptyStringAsZeroDoubleSerializer : KSerializer<Double> {
     }
 }
 
+object SecondsAsDurationSerializer : KSerializer<Duration> by Double.serializer().xmap(
+    { toDouble(DurationUnit.SECONDS) },
+    { toDuration(DurationUnit.SECONDS) }
+)
+
 @Serializable(with = Animation.Serializer::class)
 data class Animation(
     val uuid: UUID,
     val name: String,
     val loop: LoopMode,
     val override: Boolean,
-    val length: Double,
+    val length: Duration,
     val snapping: Int,
     val selected: Boolean,
     // "anim_time_update": "",
     //      "blend_weight": "",
-    @Serializable(with = EmptyStringAsZeroDoubleSerializer::class)
-    val startDelay: Double = .0,
-    @Serializable(with = EmptyStringAsZeroDoubleSerializer::class)
-    val loopDelay: Double = .0,
+//    @Serializable(with = EmptyStringAsZeroDoubleSerializer::class)
+//    val startDelay: Double = .0,
+//    @Serializable(with = EmptyStringAsZeroDoubleSerializer::class)
+//    val loopDelay: Double = .0,
     val animators: Map<UUID, Animator>,
     val effects: Animator?
 ) {
@@ -76,11 +85,11 @@ data class Animation(
             val name = root["name"]!!.jsonPrimitive.content
             val loop = json.decodeFromJsonElement(LoopMode.serializer(), root["loop"]!!)
             val override = root["override"]!!.jsonPrimitive.boolean
-            val length = root["length"]!!.jsonPrimitive.double
+            val length = json.decodeFromJsonElement(SecondsAsDurationSerializer, root["length"]!!)
             val snapping = root["snapping"]!!.jsonPrimitive.int
             val selected = root["selected"]!!.jsonPrimitive.boolean
-            val startDelay = json.decodeFromJsonElement(EmptyStringAsZeroDoubleSerializer, root["start_delay"]!!)
-            val loopDelay = json.decodeFromJsonElement(EmptyStringAsZeroDoubleSerializer, root["loop_delay"]!!)
+            // val startDelay = json.decodeFromJsonElement(EmptyStringAsZeroDoubleSerializer, root["start_delay"]!!)
+            // val loopDelay = json.decodeFromJsonElement(EmptyStringAsZeroDoubleSerializer, root["loop_delay"]!!)
             val animatorsJson = root["animators"]!!.jsonObject
             var effects: Animator? = null
             val animators = HashMap<UUID, Animator>()
@@ -89,7 +98,7 @@ data class Animation(
                 if (uidStr == "effects") effects = animator
                 else animators[UUID.fromString(uidStr)] = animator
             }
-            return Animation(uuid, name, loop, override, length, snapping, selected, startDelay, loopDelay, animators, effects)
+            return Animation(uuid, name, loop, override, length, snapping, selected, animators, effects)
         }
     }
 
@@ -104,7 +113,8 @@ data class Animation(
             val channel: Channel,
             val dataPoints: List<DataPoint>,
             val uuid: UUID,
-            val time: Double,
+            /** When this keyframe is played from the origin of this animation. */
+            val time: Duration,
             val color: Int,
             val interpolation: Interpolation,
         ) {
@@ -147,7 +157,7 @@ data class Animation(
                 val channel = Channel.valueOf(get("channel")!!.jsonPrimitive.content.uppercase())
                 val interpolation = Interpolation.valueOf(get("interpolation")!!.jsonPrimitive.content.uppercase())
                 val uuid = UUID.fromString(get("uuid")!!.jsonPrimitive.content)
-                val time = get("time")!!.jsonPrimitive.double
+                val time = BBModelJson.decodeFromJsonElement(SecondsAsDurationSerializer, get("time")!!)
                 val color = get("color")!!.jsonPrimitive.int
                 val data = ArrayList<DataPoint>()
                 val dataArray = get("data_points")!!.jsonArray
@@ -163,7 +173,6 @@ data class Animation(
                         val file = datum["file"]!!.jsonPrimitive.content
                         data += DataPoint.Sound(effect, file)
                     }
-                    else -> error("Unhandled keyframe channel $channel : $dataArray")
                 }
 
                 KeyFrame(channel, data, uuid, time, color, interpolation)

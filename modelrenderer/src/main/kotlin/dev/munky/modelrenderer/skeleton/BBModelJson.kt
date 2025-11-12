@@ -1,11 +1,15 @@
 package dev.munky.modelrenderer.skeleton
 
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.StringFormat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonBuilder
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNamingStrategy
 
-private val instance = Json {
+@OptIn(ExperimentalSerializationApi::class)
+val BBModelJson = Json {
     explicitNulls = false
     coerceInputValues = true
     isLenient = true
@@ -13,5 +17,3 @@ private val instance = Json {
     namingStrategy = JsonNamingStrategy.SnakeCase // do i dont have to make five billion serial name annotations
     allowStructuredMapKeys = true
 }
-
-object BBModelJson : StringFormat by instance
