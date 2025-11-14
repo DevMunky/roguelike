@@ -28,14 +28,18 @@ data class Bone(
 
     @Transient
     override val transform: Matrix4dc = Matrix4d().apply {
-        translate(origin.x, origin.y, origin.z)
+        translate(origin.x * 0.4, origin.y * 0.4, origin.z * 0.4)
+        rotateXYZ(rotation.x, rotation.y, rotation.z)
     }
 
     internal fun init(elements: Map<UUID, Cube>) {
         val children = HashMap<UUID, ModelPart>()
         for (child in rawChildren) {
             when (child) {
-                is Bone -> children[child.uuid] = child
+                is Bone -> {
+                    children[child.uuid] = child
+                    child.init(elements)
+                }
                 is Cube.Ref -> children[child.uuid] = elements[child.uuid] ?: error("Unknown element reference '${child.uuid}'.")
             }
         }

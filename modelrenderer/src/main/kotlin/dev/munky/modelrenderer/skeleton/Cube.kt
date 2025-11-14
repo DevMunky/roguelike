@@ -41,7 +41,7 @@ data class Cube(
         val midX = (from.x + to.x) / 2.0
         val midY = (from.y + to.y) / 2.0
         val midZ = (from.z + to.z) / 2.0
-        translation(midX, midY, midZ)
+        translation(midX * 0.4, midY * 0.4, midZ * 0.4)
         // Maybe rotateLocal?
         rotation?.let {
             rotateXYZ(toRadians(it.x), toRadians(it.y), toRadians(it.z))

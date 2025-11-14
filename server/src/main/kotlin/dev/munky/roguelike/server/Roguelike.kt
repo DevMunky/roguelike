@@ -6,7 +6,7 @@ import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.ServerProcess
 
-class RoguelikeServer {
+class Roguelike {
     lateinit var mc: MinecraftServer
     fun process() : ServerProcess = MinecraftServer.process()
 
@@ -64,8 +64,8 @@ class RoguelikeServer {
     }
 
     companion object {
-        private lateinit var INSTANCE: RoguelikeServer
+        private lateinit var INSTANCE: Roguelike
         fun server() = INSTANCE
-        fun build(f: RoguelikeServer.()->Unit) : RoguelikeServer = RoguelikeServer().also { it.register() }.apply(f)
+        fun build(f: Roguelike.()->Unit) : Roguelike = Roguelike().also { it.register() }.apply(f)
     }
 }

@@ -1,5 +1,6 @@
 package dev.munky.roguelike.server.command
 
+import dev.munky.roguelike.server.Roguelike
 import dev.munky.tenebris.core.command.CommandBranch
 import dev.munky.roguelike.server.asComponent
 import kotlinx.coroutines.CoroutineScope
@@ -58,7 +59,7 @@ internal object CommandDSLImpl {
                     try {
                         block(s, c)
                     } catch (t: Throwable) {
-                        t.log()
+                        Roguelike.server().process().exception().handleException(t)
                         s.sendMessage("<red>Error while running that command".asComponent())
                     }
                 }

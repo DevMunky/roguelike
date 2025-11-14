@@ -19,8 +19,10 @@ class ModelEntity(
     var state: State = State.None
         private set
     var scale: Float = 1f
-    val bones = model.bones.map { ModelEntityBone(it.value, this@ModelEntity, null) }
+    val bones = ArrayList<ModelEntityBone>()
     var level : ModelPlatform.Level? = null
+    var rootEntity: ModelPlatform.ItemDisplayEntity? = null
+
     var position: Vector3d = Vector3d(.0)
         set(value) {
             moveAll(value)
@@ -28,21 +30,26 @@ class ModelEntity(
         }
 
     private fun moveAll(to: Vector3d) {
-        val mat = Matrix4d().translation(to)
-        for (bone in bones) {
-            bone.applyTransform(mat)
-        }
+        rootEntity?.teleport(to)
+    //        val mat = Matrix4d().translation(to)
+//        for (bone in bones) {
+//            bone.applyTransform(mat)
+//        }
     }
 
-    fun setLevel(level: ModelPlatform.Level) {
-        this.level = level
-    }
-
-    fun spawn() {
-        for (bone in bones) {
-            bone.spawn()
-            moveAll(position)
-        }
+    suspend fun spawn()  {
+        coroutineScope {}
+        rootEntity = level!!.spawnItemDisplay(model.visibleBox.x, model.visibleBox.y, model.visibleBox.z, "minecraft:air")
+        bones.clear()
+        val newBones = model.bones
+            .asSequence()
+            .map { rawBone ->
+                val bone = ModelEntityBone(rawBone.value, this@ModelEntity, null)
+                bone.spawn()
+                bone
+            }
+        bones.addAll(newBones)
+        moveAll(position)
     }
 
     fun despawn() {
@@ -66,14 +73,16 @@ sealed interface State {
     data object None : State
 }
 
-sealed class ModelPartEntity {
-    abstract val uuid: UUID
-    abstract val name: String
-    abstract val owner: ModelEntity
-    abstract val parent: ModelEntityBone?
-    val id: String = (parent?.id ?: "") + name
+sealed class ModelPartEntity(
+    val uuid: UUID,
+    val name: String,
+    val owner: ModelEntity,
+    val parent: ModelEntityBone?,
+) {
+    val location: String = (parent?.location?.plus("/") ?: "") + name
+    val id: String = owner.model.name + ":" + location
 
-    open fun spawn() {}
+    open suspend fun spawn() {}
     open fun despawn() {}
 
     fun update(state: State): Unit = when(state) {
@@ -108,7 +117,7 @@ sealed class ModelPartEntity {
                     val modelOrigin = owner.position
                     val translate = finalMat.getTranslation(Vector3d())
                     val soundPos = modelOrigin.add(translate)
-                    owner.level.playSound(soundPos, data.effect)
+                    owner.level?.playSound(soundPos, data.effect)
                 }
             }
         }
@@ -123,11 +132,9 @@ sealed class ModelPartEntity {
  */
 class ModelEntityBone(
     val bone: Bone,
-    override val owner: ModelEntity,
-    override val parent: ModelEntityBone?
-) : ModelPartEntity() {
-    override val uuid: UUID = bone.uuid
-    override val name: String = bone.name
+    owner: ModelEntity,
+    parent: ModelEntityBone?
+) : ModelPartEntity(bone.uuid, bone.name, owner, parent) {
     val bones: Map<UUID, ModelEntityBone>
     val cubes: Map<UUID, CubeEntity>
 
@@ -142,7 +149,7 @@ class ModelEntityBone(
         this.cubes = cubes
     }
 
-    override fun spawn() {
+    override suspend fun spawn() {
         for (bone in bones.values) {
             bone.spawn()
         }
@@ -166,18 +173,17 @@ class ModelEntityBone(
  */
 class CubeEntity(
     val cube: Cube,
-    override val owner: ModelEntity,
-    override val parent: ModelEntityBone
-) : ModelPartEntity() {
-    override val uuid: UUID = cube.uuid
-    override val name: String = cube.name
+    owner: ModelEntity,
+    parent: ModelEntityBone
+) : ModelPartEntity(cube.uuid, cube.name, owner, parent) {
 
     var entity: ModelPlatform.ItemDisplayEntity? = null
         private set
 
-    override fun spawn() {
+    override suspend fun spawn() {
         val level = owner.level ?: error("ModelEntity has no level. Call ModelEntity.setLevel(ModelPlatform.Level) first.")
         entity = level.spawnItemDisplay(cube.from.x,cube.from.y,cube.from.z, id)
+        entity!!.ride(owner.rootEntity!!)
     }
 
     override fun applyTransform(mat: Matrix4dc) {
@@ -185,8 +191,8 @@ class CubeEntity(
         val translate = final.getTranslation(Vector3d())
         val rotate = final.getUnnormalizedRotation(Quaterniond())
         val scale = final.getScale(Vector3d())
-        val entity = entity ?: error("ItemDisplayEntity not yet spawned. Call ModelEntity.spawn() first.")
-        entity.move(translate)
+        val entity = entity ?: error("ItemDisplayEntity not yet spawned. Call ModelEntity.spawn() first (cube '$id').")
+        entity.translate(translate)
         entity.scale(scale)
         entity.rotateRightHanded(rotate)
     }
