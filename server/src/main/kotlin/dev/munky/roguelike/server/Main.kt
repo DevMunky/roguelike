@@ -9,6 +9,8 @@ import net.minestom.server.coordinate.Pos
 import net.minestom.server.coordinate.Vec
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityType
+import net.minestom.server.entity.metadata.display.AbstractDisplayMeta
+import net.minestom.server.entity.metadata.display.TextDisplayMeta
 import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.instance.Instance
@@ -44,7 +46,7 @@ suspend fun main() {
         it.player.isAllowFlying = true
     }
 
-    entity.setInstance(instance, Pos.ZERO)
+    entity.setInstance(instance, Pos(.0, 5.0, .0))
 
     Roguelike.server().start("localhost", 25565)
     while (Roguelike.server().process().isAlive) delay(1000)
@@ -64,7 +66,7 @@ abstract class MinestomModelEntity(val model: Model) : Entity(EntityType.TEXT_DI
     }
 
     override fun tick(time: Long) {
-        if (modelEntity.rootEntity != null ) velocity = Vec(0.1, .0, .0)
+        if (modelEntity.rootEntity != null ) velocity = Vec(0.05, .0, .0)
         super.tick(time)
     }
 

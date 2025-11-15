@@ -42,7 +42,7 @@ class MinestomModelPlatform : ModelPlatform {
             val entity = Entity(EntityType.ITEM_DISPLAY)
             entity.setNoGravity(true)
             entity.editEntityMeta(ItemDisplayMeta::class.java) {
-                it.itemStack = ItemStack.of(Material.fromKey("minecraft:oak_planks"))
+                it.itemStack = ItemStack.of(Material.fromKey("minecraft:black_wool"))
             }
             val spawn = Pos(x, y, z)
             instance.loadChunk(spawn).asDeferred().join()

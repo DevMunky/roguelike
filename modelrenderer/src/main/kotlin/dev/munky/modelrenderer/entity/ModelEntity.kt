@@ -5,6 +5,10 @@ import dev.munky.modelrenderer.skeleton.Animation
 import dev.munky.modelrenderer.skeleton.Bone
 import dev.munky.modelrenderer.skeleton.Cube
 import dev.munky.modelrenderer.skeleton.Model
+import dev.munky.roguelike.common.launch
+import dev.munky.roguelike.common.toRadians
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import org.joml.Matrix4d
 import org.joml.Matrix4dc
 import org.joml.Quaterniond
@@ -18,38 +22,44 @@ class ModelEntity(
 ) {
     var state: State = State.None
         private set
-    var scale: Float = 1f
+    var scale: Double = 1.0
     val bones = ArrayList<ModelEntityBone>()
     var level : ModelPlatform.Level? = null
     var rootEntity: ModelPlatform.ItemDisplayEntity? = null
-
     var position: Vector3d = Vector3d(.0)
         set(value) {
             moveAll(value)
             field = value
         }
+    private var spawned: Boolean = false
 
     private fun moveAll(to: Vector3d) {
+        if (!spawned) return
         rootEntity?.teleport(to)
-    //        val mat = Matrix4d().translation(to)
-//        for (bone in bones) {
-//            bone.applyTransform(mat)
-//        }
+        val mat = Matrix4d()
+            .scale(scale, scale, scale)
+            .rotateX(to.x().toRadians())
+        for (bone in bones) {
+            bone.applyTransform(mat)
+        }
     }
 
-    suspend fun spawn()  {
-        coroutineScope {}
-        rootEntity = level!!.spawnItemDisplay(model.visibleBox.x, model.visibleBox.y, model.visibleBox.z, "minecraft:air")
-        bones.clear()
-        val newBones = model.bones
-            .asSequence()
-            .map { rawBone ->
-                val bone = ModelEntityBone(rawBone.value, this@ModelEntity, null)
-                bone.spawn()
-                bone
-            }
-        bones.addAll(newBones)
-        moveAll(position)
+    fun spawn() {
+        Dispatchers.Default.launch {
+            rootEntity = level!!.spawnItemDisplay(
+                model.visibleBox.x(),
+                model.visibleBox.y(),
+                model.visibleBox.z(),
+                "minecraft:air")
+            bones.clear()
+
+            val newBones = model.bones.map { ModelEntityBone(it.value, this@ModelEntity, null) }
+            newBones.forEach { it.spawn() }
+            spawned = true
+
+            bones.addAll(newBones)
+            moveAll(position)
+        }
     }
 
     fun despawn() {
@@ -67,8 +77,8 @@ sealed interface State {
      * Represents a currently playing animation. [frame] is the current
      * frame in ticks that should be rendered during the tick this state is set.
      */
-    data class PlayingAnimation(val animationId: UUID, val frame: Int) : State // Start playing animation : Lerping
-    data object StoppingAnimation : State // Reset state entirely
+    data class PlayingAnimation(val animationId: UUID, val frame: Int) : State // Start playing animation : Lerp
+    data object StoppingAnimation : State // Reset the state entirely
     class Compound(vararg val states: State) : State
     data object None : State
 }
@@ -158,12 +168,29 @@ class ModelEntityBone(
         }
     }
 
+    fun localTransform() : Matrix4d {
+        val mat = Matrix4d()
+        mat
+            .rotateZ(bone.rotation.z().toRadians())
+            .rotateY(bone.rotation.y().toRadians())
+            .rotateX(bone.rotation.x().toRadians())
+        if (parent == null) return mat
+        val parentBone = parent.bone
+        val localOrigin = bone.origin.sub(parentBone.origin, Vector3d())
+        return mat.translate(localOrigin)
+    }
+
+    /**
+     * @param mat The parents transforms and the supplemental one.
+     */
     override fun applyTransform(mat: Matrix4dc) {
+        val mine = localTransform()
+        val next = mine.mul(mat)
         for (bone in bones.values) {
-            bone.applyTransform(mat)
+            bone.applyTransform(next)
         }
         for (cube in cubes.values) {
-            cube.applyTransform(mat)
+            cube.applyTransform(next)
         }
     }
 }
@@ -182,13 +209,22 @@ class CubeEntity(
 
     override suspend fun spawn() {
         val level = owner.level ?: error("ModelEntity has no level. Call ModelEntity.setLevel(ModelPlatform.Level) first.")
-        entity = level.spawnItemDisplay(cube.from.x,cube.from.y,cube.from.z, id)
+        entity = level.spawnItemDisplay(cube.from.x(),cube.from.y(),cube.from.z(), id)
         entity!!.ride(owner.rootEntity!!)
     }
 
+    fun localTransform() : Matrix4d {
+        val mat = Matrix4d()
+        mat
+            .rotateZ(cube.rotation?.z()?.toRadians() ?: .0)
+            .rotateY(cube.rotation?.y()?.toRadians() ?: .0)
+            .rotateX(cube.rotation?.x()?.toRadians() ?: .0)
+        return mat
+    }
+
     override fun applyTransform(mat: Matrix4dc) {
-        val final = cube.transform.mul(mat, Matrix4d())
-        val translate = final.getTranslation(Vector3d())
+        val final = localTransform().mul(mat)
+        val translate = final.getTranslation(Vector3d()).mul(0.1)
         val rotate = final.getUnnormalizedRotation(Quaterniond())
         val scale = final.getScale(Vector3d())
         val entity = entity ?: error("ItemDisplayEntity not yet spawned. Call ModelEntity.spawn() first (cube '$id').")

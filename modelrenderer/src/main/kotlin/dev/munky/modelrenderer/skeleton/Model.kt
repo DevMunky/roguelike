@@ -1,13 +1,12 @@
 package dev.munky.modelrenderer.skeleton
 
-import dev.munky.modelrenderer.util.Vec3d
+import dev.munky.modelrenderer.util.SerialVector3d
 import dev.munky.roguelike.common.serialization.UUIDSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -17,8 +16,6 @@ import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromStream
-import org.joml.Matrix4d
-import org.joml.Matrix4dc
 import java.io.InputStream
 
 typealias UUID = @Serializable(with = UUIDSerializer::class) java.util.UUID
@@ -38,7 +35,7 @@ data class Model(
     val meta: Meta,
     val name: String,
     val modelIdentifier: String,
-    val visibleBox: Vec3d,
+    val visibleBox: SerialVector3d,
     // val variablePlaceholders: ?,
     // val variablePlaceholderButtons: ?,
     // val timelineSetups: List<?>,
@@ -116,7 +113,6 @@ data class Model(
 interface ModelPart {
     val name: String
     val uuid: UUID
-    val transform: Matrix4dc
 }
 
 @Serializable(with = RawModelPart.Serializer::class)

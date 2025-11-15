@@ -9,3 +9,15 @@ dependencies {
     implementation(libs.adventure.minimessage)
     implementation(libs.bundles.polyglot)
 }
+
+tasks {
+    assemble {
+        dependsOn(shadowJar)
+    }
+
+    shadowJar {
+        archiveBaseName.set("server-$version.jar")
+        mergeServiceFiles()
+        minimize()
+    }
+}

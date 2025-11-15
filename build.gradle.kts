@@ -29,6 +29,7 @@ subprojects {
     apply(plugin = rootProject.libs.plugins.gradleup.shadow.get().pluginId)
 
     dependencies {
+        implementation(rootProject.libs.bundles.kotlinx.coroutines)
         implementation(rootProject.libs.bundles.kotlinx.serialization)
     }
 
