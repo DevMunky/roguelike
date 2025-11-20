@@ -24,16 +24,9 @@ suspend fun main() {
         init(Auth.Online())
     }
 
-    instance.chunkSupplier = { i, x, z ->
-        LightingChunk(i, x, z)
-    }
-    instance.setGenerator { unit ->
-        unit.modifier().fillHeight(-64, 0, Block.GRASS_BLOCK)
-    }
-
     MinecraftServer.getGlobalEventHandler().addListener(AsyncPlayerConfigurationEvent::class.java) {
         it.player.respawnPoint = Pos(0.0, 5.0, 0.0)
-        it.spawningInstance = instance
+        it.spawningInstance = Roguelike.server().mainMenu
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent::class.java) {
@@ -46,8 +39,6 @@ suspend fun main() {
             player.sendActionBar("MSPT = $mspt".asComponent())
         }
     }
-
-    entity.setInstance(instance, Pos(.0, 5.0, .0))
 
     Roguelike.server().start("localhost", 25565)
     while (Roguelike.server().process().isAlive) delay(1000)

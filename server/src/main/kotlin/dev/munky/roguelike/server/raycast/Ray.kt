@@ -69,6 +69,10 @@ data class Ray(
             return if (t != other.t) sign(t - other.t).toInt() else sign(exitT - other.exitT).toInt()
         }
 
+        fun <R> withValue(other: R): Intersection<R> {
+            return Intersection(t, point, normal, exitT, exitPoint, exitNormal, other)
+        }
+
         /**
          * Returns whether an intersection overlaps with another; if one's [Intersection.exitT] is less than or equal to the other's [Intersection.t].
          *

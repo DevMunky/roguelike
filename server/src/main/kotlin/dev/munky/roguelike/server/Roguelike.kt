@@ -2,6 +2,7 @@ package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.helpCommand
+import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance
 import dev.munky.roguelike.server.player.AccountData
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import dev.munky.roguelike.server.store.DynamicResourceStore
@@ -28,6 +29,8 @@ class Roguelike private constructor() {
         encodeDefaults = true
     }, Path("accounts/"))
     fun accounts() : DynamicResourceStore<AccountData> = accountStore
+
+    val mainMenu by lazy { MainMenuInstance.create() }
 
     fun renderDistance(r: Int) {
         requireNotTooLate()
