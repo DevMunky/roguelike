@@ -9,7 +9,9 @@ import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.common.toRadians
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import org.joml.AxisAngle4d
 import org.joml.Matrix4d
+import org.joml.Matrix4dStack
 import org.joml.Matrix4dc
 import org.joml.Quaterniond
 import org.joml.Vector3d
@@ -36,9 +38,9 @@ class ModelEntity(
     private fun moveAll(to: Vector3d) {
         if (!spawned) return
         rootEntity?.teleport(to)
-        val mat = Matrix4d()
-            .scale(scale, scale, scale)
-            .rotateX(to.x().toRadians())
+        val mat = Matrix4dStack(30) // todo calculate maximum bone depth
+        mat.scale(scale)
+        mat.rotateX(to.x().toRadians())
         for (bone in bones) {
             bone.applyTransform(mat)
         }
@@ -96,7 +98,7 @@ sealed class ModelPartEntity(
     open fun despawn() {}
 
     fun update(state: State): Unit = when(state) {
-        is State.None, is State.StoppingAnimation -> applyTransform(Matrix4d())
+        is State.None, is State.StoppingAnimation -> applyTransform(Matrix4dStack(30)) // todo calculate remaining bone depth
         is State.Compound -> for (s in state.states) update(s)
         is State.PlayingAnimation -> when (this) {
             is ModelEntityBone -> {
@@ -114,27 +116,27 @@ sealed class ModelPartEntity(
         val minTime = animation.length * ((lastFrame * 50.0).milliseconds / animation.length)
         val maxTime = animation.length * ((frame * 50.0).milliseconds / animation.length)
         val keyframes = animator.keyframes.filter { it.time in minTime..maxTime }
-        val finalMat = Matrix4d()
+        val stack = Matrix4dStack(30) // todo calculate remaining bone depth
         for (keyframe in keyframes) {
             for (data in keyframe.dataPoints) when (data) {
                 is Animation.Animator.KeyFrame.DataPoint.Vec3d -> when (keyframe.channel) {
-                    Animation.Animator.KeyFrame.Channel.SCALE -> finalMat.scale(data.x, data.y, data.z)
-                    Animation.Animator.KeyFrame.Channel.POSITION -> finalMat.translate(data.x, data.y, data.z)
-                    Animation.Animator.KeyFrame.Channel.ROTATION -> finalMat.rotateXYZ(data.x, data.y, data.z)
+                    Animation.Animator.KeyFrame.Channel.SCALE -> stack.scale(data.x, data.y, data.z)
+                    Animation.Animator.KeyFrame.Channel.POSITION -> stack.translate(data.x, data.y, data.z)
+                    Animation.Animator.KeyFrame.Channel.ROTATION -> stack.rotateXYZ(data.x, data.y, data.z)
                     else -> error("Unreachable ($keyframe)")
                 }
                 is Animation.Animator.KeyFrame.DataPoint.Sound -> {
                     val modelOrigin = owner.position
-                    val translate = finalMat.getTranslation(Vector3d())
+                    val translate = stack.getTranslation(Vector3d())
                     val soundPos = modelOrigin.add(translate)
                     owner.level?.playSound(soundPos, data.effect)
                 }
             }
         }
-        applyTransform(finalMat)
+        applyTransform(stack)
     }
 
-    abstract fun applyTransform(mat: Matrix4dc)
+    abstract fun applyTransform(mat: Matrix4dStack)
 }
 
 /**
@@ -170,28 +172,32 @@ class ModelEntityBone(
 
     fun localTransform() : Matrix4d {
         val mat = Matrix4d()
+        if (parent != null) {
+            val localOrigin = bone.origin.sub(parent.bone.origin, Vector3d())
+            mat.translate(localOrigin)
+        }
         mat
+            .translate(bone.pivot)
+            // Blockbench uses ZYX order for Euler rotations
             .rotateZ(bone.rotation.z().toRadians())
             .rotateY(bone.rotation.y().toRadians())
             .rotateX(bone.rotation.x().toRadians())
-        if (parent == null) return mat
-        val parentBone = parent.bone
-        val localOrigin = bone.origin.sub(parentBone.origin, Vector3d())
-        return mat.translate(localOrigin)
+            .translate(-bone.pivot.x(), -bone.pivot.y(), -bone.pivot.z())
+        return mat
     }
 
     /**
      * @param mat The parents transforms and the supplemental one.
      */
-    override fun applyTransform(mat: Matrix4dc) {
-        val mine = localTransform()
-        val next = mine.mul(mat)
+    override fun applyTransform(mat: Matrix4dStack) {
+        mat.pushMatrix().mul(localTransform())
         for (bone in bones.values) {
-            bone.applyTransform(next)
+            bone.applyTransform(mat)
         }
         for (cube in cubes.values) {
-            cube.applyTransform(next)
+            cube.applyTransform(mat)
         }
+        mat.popMatrix()
     }
 }
 
@@ -215,18 +221,24 @@ class CubeEntity(
 
     fun localTransform() : Matrix4d {
         val mat = Matrix4d()
+        // Apply rotation around pivot, then move the cube to its 'from' position
         mat
+            .translate(cube.pivot)
+            // Blockbench uses ZYX order for Euler rotations
             .rotateZ(cube.rotation?.z()?.toRadians() ?: .0)
             .rotateY(cube.rotation?.y()?.toRadians() ?: .0)
             .rotateX(cube.rotation?.x()?.toRadians() ?: .0)
+            .translate(-cube.pivot.x(), -cube.pivot.y(), -cube.pivot.z())
+            .translate(cube.from)
         return mat
     }
 
-    override fun applyTransform(mat: Matrix4dc) {
-        val final = localTransform().mul(mat)
+    override fun applyTransform(mat: Matrix4dStack) {
+        // Cubes inherit their parent bone transforms; apply parent first, then local
+        val final = Matrix4d(mat).mul(localTransform())
         val translate = final.getTranslation(Vector3d()).mul(0.1)
         val rotate = final.getUnnormalizedRotation(Quaterniond())
-        val scale = final.getScale(Vector3d())
+        val scale = final.getScale(Vector3d()).mul(0.1)
         val entity = entity ?: error("ItemDisplayEntity not yet spawned. Call ModelEntity.spawn() first (cube '$id').")
         entity.translate(translate)
         entity.scale(scale)

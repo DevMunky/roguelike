@@ -9,14 +9,12 @@ import net.minestom.server.coordinate.Pos
 import net.minestom.server.coordinate.Vec
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityType
-import net.minestom.server.entity.metadata.display.AbstractDisplayMeta
-import net.minestom.server.entity.metadata.display.TextDisplayMeta
 import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
+import net.minestom.server.event.server.ServerTickMonitorEvent
 import net.minestom.server.instance.Instance
 import net.minestom.server.instance.LightingChunk
 import net.minestom.server.instance.block.Block
-import net.minestom.server.utils.chunk.ChunkSupplier
 import org.joml.Vector3d
 import java.io.File
 import java.util.concurrent.CompletableFuture
@@ -25,10 +23,6 @@ suspend fun main() {
     Roguelike.build {
         init(Auth.Online())
     }
-    val instance = Roguelike.server().process().instance().createInstanceContainer()
-    val file = File("model/fott_byleth.bbmodel")
-    val model = file.inputStream().buffered().use { Model.decodeFromInputStream(it) }
-    val entity = TestModelEntity(model)
 
     instance.chunkSupplier = { i, x, z ->
         LightingChunk(i, x, z)
@@ -44,6 +38,13 @@ suspend fun main() {
 
     MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent::class.java) {
         it.player.isAllowFlying = true
+    }
+
+    MinecraftServer.getGlobalEventHandler().addListener(ServerTickMonitorEvent::class.java) {
+        val mspt = String.format("%.2f", it.tickMonitor.tickTime)
+        for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
+            player.sendActionBar("MSPT = $mspt".asComponent())
+        }
     }
 
     entity.setInstance(instance, Pos(.0, 5.0, .0))

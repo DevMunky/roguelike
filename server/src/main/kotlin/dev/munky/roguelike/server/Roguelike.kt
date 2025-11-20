@@ -2,11 +2,18 @@ package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.helpCommand
+import dev.munky.roguelike.server.player.AccountData
+import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.store.DynamicResourceStore
+import dev.munky.roguelike.server.store.DynamicResourceStoreImpl
+import kotlinx.serialization.json.Json
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.ServerProcess
+import java.nio.file.FileSystem
+import kotlin.io.path.Path
 
-class Roguelike {
+class Roguelike private constructor() {
     lateinit var mc: MinecraftServer
     fun process() : ServerProcess = MinecraftServer.process()
 
@@ -15,6 +22,12 @@ class Roguelike {
 
     private val terminal = MinestomCommandTerminal()
     fun terminal() : MinestomCommandTerminal = terminal
+
+    private val accountStore = DynamicResourceStoreImpl(AccountData.serializer(), Json {
+        prettyPrint = true
+        encodeDefaults = true
+    }, Path("accounts/"))
+    fun accounts() : DynamicResourceStore<AccountData> = accountStore
 
     fun renderDistance(r: Int) {
         requireNotTooLate()
@@ -46,6 +59,7 @@ class Roguelike {
     fun init(auth: Auth) {
         mc = MinecraftServer.init(auth)
         MinecraftServer.setBrandName("roguelike")
+        MinecraftServer.getConnectionManager().setPlayerProvider(::RoguelikePlayer)
         registerCommands()
     }
 
@@ -64,8 +78,11 @@ class Roguelike {
     }
 
     companion object {
+        const val NAMESPACE = "roguelike"
         private lateinit var INSTANCE: Roguelike
         fun server() = INSTANCE
-        fun build(f: Roguelike.()->Unit) : Roguelike = Roguelike().also { it.register() }.apply(f)
+        fun build(f: Roguelike.()->Unit) : Roguelike =
+            if (::INSTANCE.isInitialized) error("There is already an instance of Roguelike.")
+            else Roguelike().also(f).also(Roguelike::register)
     }
 }

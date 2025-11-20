@@ -9,7 +9,9 @@ import net.minestom.server.coordinate.Pos
 import net.minestom.server.coordinate.Vec
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityType
+import net.minestom.server.entity.metadata.display.AbstractDisplayMeta
 import net.minestom.server.entity.metadata.display.ItemDisplayMeta
+import net.minestom.server.entity.metadata.display.TextDisplayMeta
 import net.minestom.server.instance.Instance
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
@@ -40,18 +42,29 @@ class MinestomModelPlatform : ModelPlatform {
             model: String
         ): ModelPlatform.ItemDisplayEntity {
             val entity = Entity(EntityType.ITEM_DISPLAY)
+            val spawn = Pos(x, y, z)
+            instance.loadChunk(spawn).asDeferred().join()
+            entity.setInstance(instance, spawn)
             entity.setNoGravity(true)
             entity.editEntityMeta(ItemDisplayMeta::class.java) {
                 it.itemStack = ItemStack.of(Material.fromKey("minecraft:black_wool"))
             }
-            val spawn = Pos(x, y, z)
-            instance.loadChunk(spawn).asDeferred().join()
-            entity.setInstance(instance, spawn)
-            return MinestomItemDisplayEntity(entity)
+            return MinestomItemDisplayEntity(entity, model)
         }
     }
 
-    class MinestomItemDisplayEntity(val entity: Entity) : ModelPlatform.ItemDisplayEntity {
+    class MinestomItemDisplayEntity(val entity: Entity, val resource: String) : ModelPlatform.ItemDisplayEntity {
+        val debugName = Entity(EntityType.TEXT_DISPLAY)
+        init {
+            debugName.setInstance(entity.instance!!, entity.position)
+            debugName.editEntityMeta(TextDisplayMeta::class.java) {
+                it.scale = Vec(0.1, 0.1, 0.1)
+                it.text = resource.asComponent()
+                it.billboardRenderConstraints = AbstractDisplayMeta.BillboardConstraints.CENTER
+            }
+            debugName.setNoGravity(true)
+        }
+
         override fun ride(entity: ModelPlatform.ItemDisplayEntity) {
             if (entity !is MinestomItemDisplayEntity) error("Cannot ride other platforms.")
             entity.entity.addPassenger(this.entity)
@@ -62,9 +75,11 @@ class MinestomModelPlatform : ModelPlatform {
         }
 
         override fun translate(to: Vector3dc) {
+            val location = Pos(to.x(), to.y(), to.z())
             entity.editEntityMeta(ItemDisplayMeta::class.java) {
-                it.translation = Vec(to.x(), to.y(), to.z())
+                it.translation = location
             }
+            debugName.teleport(entity.position.add(location))
         }
 
         override fun scale(by: Vector3dc) {
