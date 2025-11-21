@@ -3,6 +3,7 @@ package dev.munky.roguelike.server.instance.town
 import net.minestom.server.MinecraftServer
 import net.minestom.server.instance.InstanceContainer
 import net.minestom.server.instance.LightingChunk
+import net.minestom.server.instance.anvil.AnvilLoader
 import net.minestom.server.instance.block.Block
 import net.minestom.server.registry.RegistryKey
 import net.minestom.server.world.DimensionType
@@ -13,6 +14,7 @@ class TownInstance private constructor() : InstanceContainer(UUID.randomUUID(), 
         chunkSupplier = { i, x, z ->
             LightingChunk(i, x, z)
         }
+        chunkLoader = AnvilLoader("town")
         setGenerator {
             it.modifier().fillHeight(-64, -45, Block.STONE)
         }

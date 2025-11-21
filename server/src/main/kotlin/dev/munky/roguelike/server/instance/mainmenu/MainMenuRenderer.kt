@@ -1,10 +1,12 @@
 package dev.munky.roguelike.server.instance.mainmenu
 
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
+import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.instance.town.TownInstance
+import dev.munky.roguelike.server.instance.town.TownRenderer
 import dev.munky.roguelike.server.raycast.Ray
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Entity
@@ -58,7 +60,12 @@ object MainMenuRenderer : Renderer {
         watchAndRequire(SelectedOption) {
             when (it) {
                 Option.SELECT_CHARACTER -> {
-                    player.setInstance(TownInstance.create())
+                    player.setInstance(TownInstance.create()).whenComplete { _, _ ->
+                        RenderDispatch.with(TownRenderer)
+                            .with(RenderKey.Player, player)
+                            .dispatch()
+                    }
+                    dispose()
                 }
                 Option.CREATE_CHARACTER -> {
                     player.sendMessage("Not implemented.")
@@ -75,6 +82,8 @@ object MainMenuRenderer : Renderer {
         }
 
         onDispose {
+            createCharacterEntity.remove()
+            selectCharacterEntity.remove()
             MinecraftServer.getGlobalEventHandler().removeChild(eventNode)
         }
     }

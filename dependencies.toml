@@ -12,7 +12,7 @@ polyglot = "25.0.1"
 
 # minecraft
 minestom = "2025.10.31-1.21.10"
-adventure = "4.20.0"
+adventure = "4.25.0"
 
 # util
 joml = "1.10.5"
@@ -36,7 +36,7 @@ logback-core = { group = "ch.qos.logback", name = "logback-core", version.ref = 
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 
 polyglot-core = { module = "org.graalvm.polyglot:polyglot", version.ref = "polyglot" }
-polyglot-js = { module = "org.graalvm.polyglot:js", version.ref = "polyglot" }
+polyglot-js = { module = "org.graalvm.js:js", version.ref = "polyglot" }
 
 joml = { module = "org.joml:joml", version.ref = "joml"}
 

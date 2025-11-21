@@ -35,6 +35,8 @@ internal object RenderDispatcher {
                 }
             })
 
+        val handle = contexts.add(ctx)
+
         if (renderer != null) ctx.launch {
             // This is to enable the nice abstract extension function for Renderers.
             with (renderer) {
@@ -42,7 +44,7 @@ internal object RenderDispatcher {
             }
         }
 
-        return contexts.add(ctx)
+        return handle
     }
 
     internal operator fun get(handle: Int): RenderContext? = if (handle == EMPTY_HANDLE) RenderContext.EMPTY else contexts[handle]
@@ -75,7 +77,9 @@ internal object RenderDispatcher {
                 grow()
             }
             contexts[index] = ctx
-            return createHandle(index)
+            val rawHandle = createHandle(index)
+            ctx.rawHandle = rawHandle
+            return RenderHandle(rawHandle)
         }
 
         fun remove(handle: Int): InternalRenderContext? {
@@ -124,7 +128,7 @@ internal object RenderDispatcher {
                 LOGGER.info("Slot# at ind $index is ${slotCounts[index]} and handle is slot# ${handle.getSlotCount()}. Returned null.")
                 return null
             }
-            require(0 <= index && index < capacity) { "Array index out of bounds" }
+            require(index in 0..<capacity) { "Array index out of bounds" }
             if (contexts[index] == null) return null
             return handle
         }
@@ -139,8 +143,8 @@ internal object RenderDispatcher {
         }
 
         // I could ditch RenderHandle entirely, as it has no necessity, and instead return an instance of WrappedRenderContext.
-        private inner class WrappedRenderContext(private val handle: Int) : InternalRenderContext {
-            private val ctx: InternalRenderContext get() = getReal(handle)
+        private inner class WrappedRenderContext(override var rawHandle: Int) : InternalRenderContext {
+            private val ctx: InternalRenderContext get() = getReal(rawHandle)
             override fun <T> get(key: RenderContext.Key<T>): T? = ctx[key]
             override fun <T> get(key: RenderContext.StableKey<T>): T = ctx[key]
             override fun <T> set(key: RenderContext.Key<T>, value: T): RenderContext = ctx.set(key, value)
@@ -153,12 +157,12 @@ internal object RenderDispatcher {
             override val coroutineContext: CoroutineContext get() = ctx.coroutineContext
         }
 
-        private fun createHandle(index: Int): RenderHandle {
+        private fun createHandle(index: Int): Int {
             val slotCount = slotCounts[index].plus(1u).toUShort()
             if (slotCount + 1u > UShort.MAX_VALUE) error("Slot Count overflow! RenderDispatch Spam?")
             slotCounts[index] = slotCount
             val handle = index or (slotCount.toInt() shl 24)
-            return RenderHandle(handle)
+            return handle
         }
 
         fun debugHandle(handle: Int): String {

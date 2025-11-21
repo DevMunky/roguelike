@@ -26,7 +26,10 @@ import java.util.concurrent.CompletableFuture
 
 suspend fun main(vararg args: String) {
     val prop = Properties()
-    prop.load(File("server.properties").inputStream())
+    val propFile = File("server.properties")
+    if (propFile.exists()) propFile.inputStream().use {
+        prop.load(it)
+    }
     Roguelike.build {
         init(Auth.Online())
     }
@@ -38,7 +41,7 @@ suspend fun main(vararg args: String) {
 
     MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent::class.java) {
         it.player.isAllowFlying = true
-        val handle = RenderDispatch
+        if (it.player.instance is MainMenuInstance) RenderDispatch
             .with(MainMenuRenderer)
             .with(RenderKey.Player, it.player)
             .dispatch()
@@ -52,7 +55,7 @@ suspend fun main(vararg args: String) {
         }
     }
 
-    Roguelike.server().start("localhost", prop.getProperty("server-port")?.toInt() ?: 25565)
+    Roguelike.server().start(prop.getProperty("server-ip") ?: "localhost", prop.getProperty("server-port")?.toInt() ?: 25565)
 
     while (Roguelike.server().process().isAlive) delay(1000)
 }

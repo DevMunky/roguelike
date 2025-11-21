@@ -24,6 +24,7 @@ internal data class RenderContextImpl(
         for((key, value) in initialData) data[key] = createFlow(value)
     }
 
+    override var rawHandle: Int = 0
     private val data = ConcurrentHashMap<RenderContext.Key<*>, MutableSharedFlow<*>>()
     private var disposer: (suspend () -> Unit)? = null
 
@@ -65,7 +66,7 @@ internal data class RenderContextImpl(
      * Otherwise, launch the disposer in this CoroutineContext, finalizing upon the [Job]'s completion.
      */
     override fun dispose() {
-        suspend fun runDisposal() {
+        suspend fun runDisposer() {
             try {
                 disposer?.invoke()
             } catch (t: Throwable) {
@@ -73,15 +74,20 @@ internal data class RenderContextImpl(
             }
         }
 
+        if (rawHandle != -1) {
+            RenderDispatcher.dispose(rawHandle)
+            rawHandle = -1
+        }
+
         if (!startDisposalsBlocking) {
             launch {
-                runDisposal()
+                runDisposer()
             }.invokeOnCompletion { finalize() }
             return
         }
 
         runBlocking {
-            runDisposal()
+            runDisposer()
         }
         finalize()
     }

@@ -31,6 +31,7 @@ sealed interface RenderContext : CoroutineScope {
      * @return The [Job] handling all disposals.
      */
     fun onDispose(block: suspend () -> Unit)
+    fun dispose()
 
     fun <T> watch(key: Key<T>, collector: FlowCollector<T?>): Job
     fun <T> watch(key: StableKey<T>, collector: FlowCollector<T>): Job
@@ -56,5 +57,5 @@ sealed interface RenderContext : CoroutineScope {
 }
 
 internal interface InternalRenderContext : RenderContext {
-    fun dispose()
+    var rawHandle: Int
 }
