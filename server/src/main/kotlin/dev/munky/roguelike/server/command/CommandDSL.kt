@@ -1,6 +1,5 @@
-package dev.munky.tenebris.core.command
+package dev.munky.roguelike.server.command
 
-import dev.munky.roguelike.server.command.CommandDSLImpl
 import net.minestom.server.command.CommandSender
 import net.minestom.server.command.builder.ArgumentCallback
 import net.minestom.server.command.builder.Command

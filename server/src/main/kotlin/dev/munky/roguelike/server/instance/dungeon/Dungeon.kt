@@ -1,11 +1,10 @@
 package dev.munky.roguelike.server.instance.dungeon
 
+import dev.munky.roguelike.server.instance.town.TownInstance.Companion.TOWN_DIMENSION_KEY
 import net.minestom.server.MinecraftServer
 import net.minestom.server.instance.InstanceContainer
 import net.minestom.server.instance.LightingChunk
 import net.minestom.server.instance.block.Block
-import net.minestom.server.registry.RegistryKey
-import net.minestom.server.world.DimensionType
 import java.util.*
 
 class Dungeon private constructor(
@@ -22,10 +21,5 @@ class Dungeon private constructor(
 
     companion object {
         // builder?
-        fun create() : Dungeon {
-            val town = Dungeon()
-            MinecraftServer.getInstanceManager().registerInstance(town)
-            return town
-        }
     }
 }

@@ -26,6 +26,8 @@ object MainMenuRenderer : Renderer {
 
     override suspend fun RenderContext.render() {
         val player = require(RenderKey.Player)
+        val mainMenu = player.instance as? MainMenuInstance ?: return
+
         val eventNode = EventNode.event("${Roguelike.NAMESPACE}:main_menu_renderer.${player.username}", EventFilter.PLAYER) { it.player == player }
         MinecraftServer.getGlobalEventHandler().addChild(eventNode)
 
@@ -34,8 +36,8 @@ object MainMenuRenderer : Renderer {
         val selectCharacterEntity = Entity(EntityType.VILLAGER)
         val createCharacterEntity = Entity(EntityType.VILLAGER)
 
-        selectCharacterEntity.setInstance(player.instance!!, player.position.add(-2.0, .0, 2.0).withYaw(-180f))
-        createCharacterEntity.setInstance(player.instance!!, player.position.add(2.0, .0,  2.0).withYaw(-180f))
+        selectCharacterEntity.setInstance(mainMenu, player.position.add(-2.0, .0, 2.0).withYaw(-180f))
+        createCharacterEntity.setInstance(mainMenu, player.position.add(2.0, .0,  2.0).withYaw(-180f))
 
         eventNode.addListener(PlayerMoveEvent::class.java) {
             val player = it.player

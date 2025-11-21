@@ -1,6 +1,7 @@
 package dev.munky.roguelike.server.player
 
 import dev.munky.roguelike.server.Roguelike
+import dev.munky.roguelike.server.interact.Conversation
 import kotlinx.serialization.Serializable
 import net.minestom.server.entity.Player
 import net.minestom.server.network.player.GameProfile
@@ -13,6 +14,7 @@ import net.minestom.server.network.player.PlayerConnection
 class RoguelikePlayer(connection: PlayerConnection, profile: GameProfile) : Player(connection, profile) {
     val account = Roguelike.server().accounts()[uuid.toString()] ?: AccountData(username, HashSet())
     var currentCharacter = account.characters.firstOrNull()
+
 }
 
 @Serializable

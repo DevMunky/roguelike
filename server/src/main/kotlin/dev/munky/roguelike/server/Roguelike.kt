@@ -3,6 +3,7 @@ package dev.munky.roguelike.server
 import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.helpCommand
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance.Companion.MENU_DIMENSION
+import dev.munky.roguelike.server.interact.Interactable
 import dev.munky.roguelike.server.player.AccountData
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import dev.munky.roguelike.server.store.DynamicResourceStore
@@ -62,6 +63,7 @@ class Roguelike private constructor() {
         MinecraftServer.getConnectionManager().setPlayerProvider(::RoguelikePlayer)
         MinecraftServer.getDimensionTypeRegistry().register("${Roguelike.NAMESPACE}:main_menu", MENU_DIMENSION)
         registerCommands()
+        Interactable.registerEvents()
     }
 
     fun start(host: String, port: Int) {

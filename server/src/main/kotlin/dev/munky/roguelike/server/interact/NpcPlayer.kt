@@ -1,4 +1,4 @@
-package dev.munky.roguelike.server.npc
+package dev.munky.roguelike.server.interact
 
 import net.minestom.server.entity.*
 import net.minestom.server.network.packet.server.play.EntityMetaDataPacket
@@ -9,11 +9,10 @@ import net.minestom.server.network.packet.server.play.PlayerInfoUpdatePacket
  * A fake player.
  */
 abstract class NpcPlayer(
-    private var username: String? = null,
-    private var skinTexture: String? = null,
-    private var skinSignature: String? = null
+    val username: String,
+    val skinTexture: String? = null,
+    val skinSignature: String? = null
 ) : EntityCreature(EntityType.PLAYER) {
-
     override fun updateNewViewer(player: Player) {
         val properties = ArrayList<PlayerInfoUpdatePacket.Property>()
         if (skinTexture != null && skinSignature != null) {
