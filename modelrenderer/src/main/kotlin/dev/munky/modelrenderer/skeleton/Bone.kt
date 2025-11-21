@@ -1,6 +1,6 @@
 package dev.munky.modelrenderer.skeleton
 
-import dev.munky.modelrenderer.util.SerialVector3d
+import dev.munky.roguelike.common.SerialVector3d
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
