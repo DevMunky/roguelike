@@ -4,7 +4,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 fun logger(f: ()->Unit) : Logger {
-    return logger(f::class.simpleName!!.sentenceCase())
+    return logger(f::class.simpleName!!.split("$").first().sentenceCase())
 }
 
 fun logger(name: String) : Logger {

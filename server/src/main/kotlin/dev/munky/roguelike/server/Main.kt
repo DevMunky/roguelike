@@ -2,7 +2,11 @@ package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.entity.ModelEntity
 import dev.munky.modelrenderer.skeleton.Model
+import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
+import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance
+import dev.munky.roguelike.server.instance.mainmenu.MainMenuRenderer
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.Pos
@@ -17,30 +21,39 @@ import net.minestom.server.instance.LightingChunk
 import net.minestom.server.instance.block.Block
 import org.joml.Vector3d
 import java.io.File
+import java.util.Properties
 import java.util.concurrent.CompletableFuture
 
-suspend fun main() {
+suspend fun main(vararg args: String) {
+    val prop = Properties()
+    prop.load(File("server.properties").inputStream())
     Roguelike.build {
         init(Auth.Online())
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(AsyncPlayerConfigurationEvent::class.java) {
-        it.player.respawnPoint = Pos(0.0, 5.0, 0.0)
-        it.spawningInstance = Roguelike.server().mainMenu
+        it.player.respawnPoint = Pos(0.0, -44.5, 0.0)
+        it.spawningInstance = MainMenuInstance.create()
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent::class.java) {
         it.player.isAllowFlying = true
+        val handle = RenderDispatch
+            .with(MainMenuRenderer)
+            .with(RenderKey.Player, it.player)
+            .dispatch()
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(ServerTickMonitorEvent::class.java) {
         val mspt = String.format("%.2f", it.tickMonitor.tickTime)
+        val ram = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1000000.0
         for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
-            player.sendActionBar("MSPT = $mspt".asComponent())
+            player.sendActionBar("MSPT = $mspt, RAM = ${String.format("%.2f", ram)}MB".asComponent())
         }
     }
 
-    Roguelike.server().start("localhost", 25565)
+    Roguelike.server().start("localhost", prop.getProperty("server-port")?.toInt() ?: 25565)
+
     while (Roguelike.server().process().isAlive) delay(1000)
 }
 

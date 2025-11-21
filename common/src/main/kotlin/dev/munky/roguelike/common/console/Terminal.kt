@@ -7,9 +7,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.yield
 
 abstract class Terminal {
-    fun start() = Dispatchers.IO.launch { next() }
+    init {
+        Dispatchers.IO.launch { loop() }
+    }
 
-    suspend fun CoroutineScope.next() {
+    suspend fun CoroutineScope.loop() {
         while (isActive) {
             yield()
             parse(readlnOrNull() ?: continue)

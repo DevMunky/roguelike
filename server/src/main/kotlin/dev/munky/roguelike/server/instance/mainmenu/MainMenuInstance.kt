@@ -1,36 +1,36 @@
 package dev.munky.roguelike.server.instance.mainmenu
 
-import dev.munky.roguelike.server.Roguelike
 import net.minestom.server.MinecraftServer
 import net.minestom.server.instance.InstanceContainer
 import net.minestom.server.instance.LightingChunk
 import net.minestom.server.instance.block.Block
 import net.minestom.server.registry.RegistryKey
-import net.minestom.server.utils.chunk.ChunkSupplier
 import net.minestom.server.world.DimensionType
 import java.util.*
 
 /**
  * Per-player instance where players can select a character or create a new one, then transfer to town.
  */
-class MainMenuInstance private constructor() : InstanceContainer(UUID.randomUUID(), HUB_DIMENSION_KEY) {
+class MainMenuInstance private constructor() : InstanceContainer(UUID.randomUUID(), MENU_DIMENSION_KEY) {
     init {
-        chunkSupplier = ::LightingChunk as ChunkSupplier
+        chunkSupplier = { i, x, z ->
+            LightingChunk(i, x, z)
+        }
         setGenerator {
-            it.modifier().fillHeight(-64, 0, Block.GRASS_BLOCK)
+            it.modifier().fillHeight(-64, -45, Block.BLACK_CONCRETE)
         }
     }
 
     companion object {
-        val HUB_DIMENSION: DimensionType = DimensionType.builder()
+        val MENU_DIMENSION: DimensionType = DimensionType.builder()
             .coordinateScale(1.0)
             .fixedTime(0)
             .ambientLight(2f)
             .hasSkylight(false)
             .natural(true)
+            .effects("the_end")
             .build()
-        val HUB_DIMENSION_KEY: RegistryKey<DimensionType> = MinecraftServer.getDimensionTypeRegistry()
-            .register("${Roguelike.NAMESPACE}:main_menu", HUB_DIMENSION)
+        val MENU_DIMENSION_KEY: RegistryKey<DimensionType> by lazy { MinecraftServer.getDimensionTypeRegistry().getKey(MENU_DIMENSION)!! }
 
         fun create() : MainMenuInstance {
             val hub = MainMenuInstance()

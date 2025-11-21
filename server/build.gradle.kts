@@ -7,7 +7,7 @@ dependencies {
     implementation(libs.minestom)
     implementation(libs.joml)
     implementation(libs.adventure.minimessage)
-    implementation(libs.bundles.polyglot)
+    // implementation(libs.bundles.polyglot)
 }
 
 tasks {
@@ -16,8 +16,11 @@ tasks {
     }
 
     shadowJar {
-        archiveBaseName.set("server-$version.jar")
+        archiveFileName.set("server-$version.jar")
         mergeServiceFiles()
-        minimize()
+
+        manifest {
+            attributes["Main-Class"] = "dev.munky.roguelike.server.MainKt"
+        }
     }
 }

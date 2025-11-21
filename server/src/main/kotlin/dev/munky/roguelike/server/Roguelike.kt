@@ -2,7 +2,7 @@ package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.helpCommand
-import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance
+import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance.Companion.MENU_DIMENSION
 import dev.munky.roguelike.server.player.AccountData
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import dev.munky.roguelike.server.store.DynamicResourceStore
@@ -11,7 +11,6 @@ import kotlinx.serialization.json.Json
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.ServerProcess
-import java.nio.file.FileSystem
 import kotlin.io.path.Path
 
 class Roguelike private constructor() {
@@ -29,8 +28,6 @@ class Roguelike private constructor() {
         encodeDefaults = true
     }, Path("accounts/"))
     fun accounts() : DynamicResourceStore<AccountData> = accountStore
-
-    val mainMenu by lazy { MainMenuInstance.create() }
 
     fun renderDistance(r: Int) {
         requireNotTooLate()
@@ -63,6 +60,7 @@ class Roguelike private constructor() {
         mc = MinecraftServer.init(auth)
         MinecraftServer.setBrandName("roguelike")
         MinecraftServer.getConnectionManager().setPlayerProvider(::RoguelikePlayer)
+        MinecraftServer.getDimensionTypeRegistry().register("${Roguelike.NAMESPACE}:main_menu", MENU_DIMENSION)
         registerCommands()
     }
 
@@ -77,6 +75,9 @@ class Roguelike private constructor() {
     private fun requireNotTooLate() = require(!::mc.isInitialized) { "Too late to modify server flags." }
 
     private fun registerCommands() {
+        MinecraftServer.getCommandManager().unknownCommandCallback = { s, c ->
+            s.sendMessage("Unknown command '$c'.".asComponent())
+        }
         MinecraftServer.getCommandManager().register(helpCommand())
     }
 

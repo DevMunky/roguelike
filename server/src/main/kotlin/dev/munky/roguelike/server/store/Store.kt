@@ -25,6 +25,8 @@ import kotlin.io.path.walk
 
 sealed interface Store<T : Any> {
     operator fun get(key: Key): T?
+    operator fun get(value: String): T? = get(Key.key(namespace(), value))
+
     fun getOrThrow(key: Key): T = get(key) ?: error("No entry with key '$key' exists in '${id()}'.")
 
     fun namespace() = this::class.simpleName!!.snakeCase()
