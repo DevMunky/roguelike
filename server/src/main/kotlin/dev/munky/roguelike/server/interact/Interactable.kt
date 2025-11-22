@@ -3,6 +3,7 @@ package dev.munky.roguelike.server.interact
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Player
+import net.minestom.server.entity.PlayerHand
 import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
 import net.minestom.server.event.player.PlayerEntityInteractEvent
@@ -10,6 +11,9 @@ import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.event.trait.PlayerEvent
 
 interface Interactable {
+    /**
+     * Invoked for only the player's main hand.
+     */
     fun onInteract(player: RoguelikePlayer)
 
     companion object {
@@ -17,6 +21,7 @@ interface Interactable {
 
         fun registerEvents() {
             EVENT_NODE.addListener(PlayerEntityInteractEvent::class.java) {
+                if (it.hand != PlayerHand.MAIN) return@addListener
                 tryInteract(it.player, it.target)
             }
             EVENT_NODE.addListener(PlayerSpawnEvent::class.java) {

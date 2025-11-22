@@ -3,6 +3,8 @@ package dev.munky.roguelike.server.interact
 import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.common.levenshtein
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
+import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
+import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.asComponent
@@ -17,39 +19,54 @@ import net.minestom.server.MinecraftServer
 import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
 import net.minestom.server.event.player.PlayerChatEvent
+import java.util.UUID
 
 interface TalkingInteractable : Interactable {
     val conversation: Conversation
 
     override fun onInteract(player: RoguelikePlayer) {
-        Dispatchers.Default.launch {
-            conversation.start(player)
-        }
+        RenderDispatch.with(ConversationRenderer)
+            .with(conversation)
+            .with(player)
+            .dispatch()
     }
 }
 
 object ConversationRenderer : Renderer {
+    private val ongoingConversations = hashSetOf<UUID>()
+
     override suspend fun RenderContext.render() {
-        val conversation = require(Conversation)
         val player = require(RenderKey.Player) as? RoguelikePlayer ?: return
+        synchronized(ongoingConversations) {
+            if (ongoingConversations.contains(player.uuid)) {
+                return
+            } else ongoingConversations.add(player.uuid)
+        }
         val eventNode = EventNode.event("roguelike:conversation", EventFilter.PLAYER) { it.player == player }
         MinecraftServer.getGlobalEventHandler().addChild(eventNode)
 
         eventNode.addListener(PlayerChatEvent::class.java) { e ->
+            val c = require(Conversation)
+            if (c.branches.isEmpty()) {
+                dispose()
+                return@addListener
+            }
             e.isCancelled = true
+
             launch {
-                handleInput(conversation, player, e.rawMessage)
+                handleInput(c, player, e.rawMessage)
             }
         }
 
-        startConversation(player, conversation)
+        startConvo(player, require(Conversation))
 
         onDispose {
             MinecraftServer.getGlobalEventHandler().removeChild(eventNode)
+            ongoingConversations.remove(player.uuid)
         }
     }
 
-    private suspend fun startConversation(player: RoguelikePlayer, conversation: Conversation) {
+    private suspend fun startConvo(player: RoguelikePlayer, conversation: Conversation) {
         player.sendMessage(conversation.speakerName + ":".asComponent())
         player.sendMessage(conversation.prompt)
 
@@ -73,7 +90,8 @@ object ConversationRenderer : Renderer {
             return
         } else closestEntry.value
 
-        startConversation(player, closest)
+        set(Conversation, closest)
+        startConvo(player, closest)
     }
 }
 
