@@ -60,36 +60,33 @@ internal data class RenderContextImpl(
         disposer = block
     }
 
+    override fun dispose() = RenderDispatcher.dispose(rawHandle)
+
     /**
-     * If the plugin is disabling, run the disposer in an event loop on this thread, finalizing upon completion.
+     * If desired, run the disposer in an event loop on this thread, finalizing upon completion.
      *
      * Otherwise, launch the disposer in this CoroutineContext, finalizing upon the [Job]'s completion.
      */
-    override fun dispose() {
+    override fun dispose0(doEventLoop: Boolean) {
         suspend fun runDisposer() {
             try {
                 disposer?.invoke()
             } catch (t: Throwable) {
-                LOGGER.error("Exception caught disposing render context ${this@RenderContextImpl}.", t)
+                LOGGER.error("Exception caught in renderer onDisposal from render context ${this@RenderContextImpl}.", t)
             }
         }
 
-        if (rawHandle != -1) {
-            RenderDispatcher.dispose(rawHandle)
-            rawHandle = -1
-        }
-
-        if (!startDisposalsBlocking) {
-            launch {
+        if (doEventLoop) {
+            runBlocking {
                 runDisposer()
-            }.invokeOnCompletion { finalize() }
+            }
+            finalize()
             return
         }
 
-        runBlocking {
+        launch {
             runDisposer()
-        }
-        finalize()
+        }.invokeOnCompletion { finalize() }
     }
 
     // Only invoked from the disposal block.

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <conversionRule conversionWord="levelString" class="dev.munky.roguelike.common.LogbackLevelString"/>
+
+    <appender name="LOGCAT" class="ch.qos.logback.core.ConsoleAppender">
+        <withJansi>true</withJansi>
+        <!-- The vertical line char here is 'Box Drawings Light Vertical'; │  -->
+        <encoder>
+            <pattern>
+                %date{HH:mm:ss.SSS} │ %12.-12thread │ %25.25logger{20} │ %levelString │ %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+    <!-- Root logger -->
+    <root level="DEBUG">
+        <appender-ref ref="LOGCAT" />
+    </root>
+</configuration>

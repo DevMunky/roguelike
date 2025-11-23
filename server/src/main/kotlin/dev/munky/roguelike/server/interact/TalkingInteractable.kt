@@ -4,7 +4,6 @@ import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.common.levenshtein
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
-import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.asComponent
@@ -19,7 +18,7 @@ import net.minestom.server.MinecraftServer
 import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
 import net.minestom.server.event.player.PlayerChatEvent
-import java.util.UUID
+import java.util.*
 
 interface TalkingInteractable : Interactable {
     val conversation: Conversation
@@ -39,26 +38,22 @@ object ConversationRenderer : Renderer {
         val player = require(RenderKey.Player) as? RoguelikePlayer ?: return
         synchronized(ongoingConversations) {
             if (ongoingConversations.contains(player.uuid)) {
+                dispose()
                 return
             } else ongoingConversations.add(player.uuid)
         }
-        val eventNode = EventNode.event("roguelike:conversation", EventFilter.PLAYER) { it.player == player }
+        val eventNode = EventNode.event("roguelike:conversation.${player.username}", EventFilter.PLAYER) { it.player == player }
         MinecraftServer.getGlobalEventHandler().addChild(eventNode)
 
         eventNode.addListener(PlayerChatEvent::class.java) { e ->
-            val c = require(Conversation)
-            if (c.branches.isEmpty()) {
-                dispose()
-                return@addListener
-            }
             e.isCancelled = true
 
             launch {
-                handleInput(c, player, e.rawMessage)
+                handleInput(player, e.rawMessage)
             }
         }
 
-        startConvo(player, require(Conversation))
+        startConvo(player)
 
         onDispose {
             MinecraftServer.getGlobalEventHandler().removeChild(eventNode)
@@ -66,21 +61,26 @@ object ConversationRenderer : Renderer {
         }
     }
 
-    private suspend fun startConvo(player: RoguelikePlayer, conversation: Conversation) {
-        player.sendMessage(conversation.speakerName + ":".asComponent())
+    private suspend fun RenderContext.startConvo(player: RoguelikePlayer) {
+        val conversation = require(Conversation)
+        player.sendMessage(Component.newline() + conversation.speakerName + ":".asComponent())
         player.sendMessage(conversation.prompt)
 
         for ((message, _) in conversation.branches) {
             player.sendMessage("<green>-> ".asComponent() + message)
-            return
         }
 
         conversation.execute(player)
+
+        if (conversation.branches.isEmpty()) {
+            dispose()
+        }
     }
 
-    private suspend fun RenderContext.handleInput(conversation: Conversation, player: RoguelikePlayer, response: String) {
+    private suspend fun RenderContext.handleInput(player: RoguelikePlayer, response: String) {
+        val conversation = require(Conversation)
         val closestEntry = conversation.stringBranches.entries.associate {
-            levenshtein(it.key, response)to it.value
+            levenshtein(it.key, response) to it.value
         }.minBy { it.key }
 
         val closest = if (closestEntry.key > MAXIMUM_RESPONSE_DISTANCE) {
@@ -91,7 +91,7 @@ object ConversationRenderer : Renderer {
         } else closestEntry.value
 
         set(Conversation, closest)
-        startConvo(player, closest)
+        startConvo(player)
     }
 }
 

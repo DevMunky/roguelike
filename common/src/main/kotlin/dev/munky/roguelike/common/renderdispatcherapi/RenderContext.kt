@@ -58,4 +58,6 @@ sealed interface RenderContext : CoroutineScope {
 
 internal interface InternalRenderContext : RenderContext {
     var rawHandle: Int
+
+    fun dispose0(doEventLoop: Boolean)
 }

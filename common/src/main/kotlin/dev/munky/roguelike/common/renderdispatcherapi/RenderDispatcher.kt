@@ -51,7 +51,7 @@ internal object RenderDispatcher {
 
     internal fun dispose(handle: Int) {
         LOGGER.info("Disposing handle {}", contexts.debugHandle(handle))
-        contexts.remove(handle)?.dispose()
+        contexts.remove(handle)?.dispose0(startDisposalsBlocking)
         // trigger emission on the Disposal flow.
     }
 
@@ -119,7 +119,7 @@ internal object RenderDispatcher {
         @Suppress("NOTHING_TO_INLINE")
         private inline fun Int.getSlotCount(): UShort = ((this and 0xFF_00_00_00.toInt()) shr 24).toUShort()
 
-        operator fun get(handle: Int): RenderContext? = getWrapped(handle)
+        operator fun get(handle: Int): RenderContext? = contextWrappedOf(handle)
 
         private fun validHandleOf(handle: Int): Int? {
             val index = handle.getIndex()
@@ -133,28 +133,13 @@ internal object RenderDispatcher {
             return handle
         }
 
-        private fun getWrapped(handle: Int) = validHandleOf(handle)?.let { WrappedRenderContext(it) }
+        private fun contextWrappedOf(handle: Int) = validHandleOf(handle)?.let { WrappedRenderContext(it) }
 
-        private fun getReal(handle: Int) : InternalRenderContext {
+        fun contextImplOf(handle: Int) : InternalRenderContext {
             val h = validHandleOf(handle) ?: error("Invalid handle (${debugHandle(handle)}).")
             val c = contexts[h.getIndex()] ?: error("Context is disposed (${debugHandle(handle)}).")
             if (c is WrappedRenderContext) error("Wrapped contexts should never be indexed in the context list (${debugHandle(handle)}).")
             return c
-        }
-
-        // I could ditch RenderHandle entirely, as it has no necessity, and instead return an instance of WrappedRenderContext.
-        private inner class WrappedRenderContext(override var rawHandle: Int) : InternalRenderContext {
-            private val ctx: InternalRenderContext get() = getReal(rawHandle)
-            override fun <T> get(key: RenderContext.Key<T>): T? = ctx[key]
-            override fun <T> get(key: RenderContext.StableKey<T>): T = ctx[key]
-            override fun <T> set(key: RenderContext.Key<T>, value: T): RenderContext = ctx.set(key, value)
-            override fun <T> require(key: RenderContext.Key<T>): T = ctx.require(key)
-            override fun onDispose(block: suspend () -> Unit) = ctx.onDispose(block)
-            override fun dispose() = ctx.dispose()
-            override fun <T> watch(key: RenderContext.Key<T>, collector: FlowCollector<T?>): Job = ctx.watch(key, collector)
-            override fun <T> watch(key: RenderContext.StableKey<T>, collector: FlowCollector<T>): Job = ctx.watch(key, collector)
-            override fun <T> watchAndRequire(key: RenderContext.Key<T>, collector: FlowCollector<T>): Job = ctx.watchAndRequire(key, collector)
-            override val coroutineContext: CoroutineContext get() = ctx.coroutineContext
         }
 
         private fun createHandle(index: Int): Int {
@@ -173,5 +158,21 @@ internal object RenderDispatcher {
         companion object {
             private val LOGGER = logger {}
         }
+    }
+
+    // I could ditch RenderHandle entirely, as it has no necessity, and instead return an instance of WrappedRenderContext.
+    private class WrappedRenderContext(override var rawHandle: Int) : InternalRenderContext {
+        private val ctx: InternalRenderContext get() = contexts.contextImplOf(rawHandle)
+        override fun <T> get(key: RenderContext.Key<T>): T? = ctx[key]
+        override fun <T> get(key: RenderContext.StableKey<T>): T = ctx[key]
+        override fun <T> set(key: RenderContext.Key<T>, value: T): RenderContext = ctx.set(key, value)
+        override fun <T> require(key: RenderContext.Key<T>): T = ctx.require(key)
+        override fun onDispose(block: suspend () -> Unit) = ctx.onDispose(block)
+        override fun dispose() = ctx.dispose()
+        override fun dispose0(doEventLoop: Boolean) = ctx.dispose0(doEventLoop)
+        override fun <T> watch(key: RenderContext.Key<T>, collector: FlowCollector<T?>): Job = ctx.watch(key, collector)
+        override fun <T> watch(key: RenderContext.StableKey<T>, collector: FlowCollector<T>): Job = ctx.watch(key, collector)
+        override fun <T> watchAndRequire(key: RenderContext.Key<T>, collector: FlowCollector<T>): Job = ctx.watchAndRequire(key, collector)
+        override val coroutineContext: CoroutineContext get() = ctx.coroutineContext
     }
 }

@@ -24,7 +24,7 @@ class TownInstance private constructor() : InstanceContainer(UUID.randomUUID(), 
         val TOWN_DIMENSION: DimensionType = DimensionType.builder()
             .coordinateScale(1.0)
             .fixedTime(0)
-            .ambientLight(2f)
+            .ambientLight(1f)
             .hasSkylight(false)
             .natural(true)
             .effects("the_end")

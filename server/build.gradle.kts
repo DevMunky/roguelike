@@ -6,6 +6,7 @@ dependencies {
 
     implementation(libs.minestom)
     implementation(libs.joml)
+    implementation(libs.bundles.logback)
     implementation(libs.adventure.minimessage)
     implementation(libs.bundles.polyglot)
 }

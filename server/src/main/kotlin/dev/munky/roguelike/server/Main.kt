@@ -1,12 +1,14 @@
 package dev.munky.roguelike.server
 
+import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.classic.joran.JoranConfigurator
+import ch.qos.logback.core.joran.spi.JoranException
 import dev.munky.modelrenderer.entity.ModelEntity
 import dev.munky.modelrenderer.skeleton.Model
 import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuRenderer
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.Pos
@@ -17,11 +19,10 @@ import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.event.server.ServerTickMonitorEvent
 import net.minestom.server.instance.Instance
-import net.minestom.server.instance.LightingChunk
-import net.minestom.server.instance.block.Block
 import org.joml.Vector3d
+import org.slf4j.LoggerFactory
 import java.io.File
-import java.util.Properties
+import java.util.*
 import java.util.concurrent.CompletableFuture
 
 suspend fun main(vararg args: String) {
@@ -30,6 +31,10 @@ suspend fun main(vararg args: String) {
     if (propFile.exists()) propFile.inputStream().use {
         prop.load(it)
     }
+
+    val xml = Roguelike::class.java.getResource("logback.xml")
+    if (xml != null) loadLogbackConfig(xml.toExternalForm())
+
     Roguelike.build {
         init(Auth.Online())
     }
@@ -49,15 +54,29 @@ suspend fun main(vararg args: String) {
 
     MinecraftServer.getGlobalEventHandler().addListener(ServerTickMonitorEvent::class.java) {
         val mspt = String.format("%.2f", it.tickMonitor.tickTime)
-        val ram = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1000000.0
+        val ram = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1_000_000.0
         for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
-            player.sendActionBar("MSPT = $mspt, RAM = ${String.format("%.2f", ram)}MB".asComponent())
+            player.sendActionBar("<white>MSPT = $mspt, RAM = ${String.format("%.2f", ram)}MB".asComponent())
         }
     }
 
     Roguelike.server().start(prop.getProperty("server-ip") ?: "localhost", prop.getProperty("server-port")?.toInt() ?: 25565)
 
     while (Roguelike.server().process().isAlive) delay(1000)
+}
+
+fun loadLogbackConfig(path: String) {
+    val context = LoggerFactory.getILoggerFactory() as LoggerContext
+    context.reset() // wipe previous config
+
+    val configurator = JoranConfigurator()
+    configurator.setContext(context)
+
+    try {
+        configurator.doConfigure(path) // path = file or classpath resource
+    } catch (e: JoranException) {
+        throw RuntimeException("Failed to load Logback config: " + path, e)
+    }
 }
 
 abstract class MinestomModelEntity(val model: Model) : Entity(EntityType.TEXT_DISPLAY) {
