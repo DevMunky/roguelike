@@ -23,6 +23,9 @@ sealed interface RenderContext : CoroutineScope {
     @Suppress("KDocUnresolvedReference")
     operator fun <T> set(key: Key<T>, value: T): RenderContext
 
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Element> set(value: T): RenderContext = set(value.key as Key<T>, value)
+
     fun <T> require(key: Key<T>): T
 
     /**

@@ -36,6 +36,7 @@ suspend fun main(vararg args: String) {
     if (xml != null) loadLogbackConfig(xml.toExternalForm())
 
     Roguelike.build {
+        dispatchThreads(3)
         init(Auth.Online())
     }
 

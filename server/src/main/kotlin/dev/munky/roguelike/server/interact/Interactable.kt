@@ -27,6 +27,9 @@ interface Interactable {
             EVENT_NODE.addListener(PlayerSpawnEvent::class.java) {
                 tryInteract(it.player, it.instance)
             }
+            EVENT_NODE.addListener(PlayerSpawnEvent::class.java) {
+                tryInteract(it.player, it.instance)
+            }
             MinecraftServer.getGlobalEventHandler().addChild(EVENT_NODE)
         }
 

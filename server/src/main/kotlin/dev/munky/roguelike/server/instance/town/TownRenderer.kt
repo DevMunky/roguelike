@@ -11,6 +11,7 @@ import dev.munky.roguelike.server.interact.conversation
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.ai.EntityAIGroupBuilder
+import net.minestom.server.entity.ai.GoalSelector
 import net.minestom.server.entity.ai.target.ClosestEntityTarget
 
 object TownRenderer : Renderer {
@@ -23,43 +24,14 @@ object TownRenderer : Renderer {
         npc.setInstance(town, Pos(5.0, .0, 5.0))
         npc.addViewer(player)
 
-        watchAndRequire(StateKey) {
-            when (it) {
-                State.TALKING -> {
-                    npc.lookAt(player)
-                    player.fieldViewModifier = 2f
-                }
-                else -> {
-                    player.fieldViewModifier = 1f
-                }
-            }
-        }
-
         onDispose {
             npc.remove()
         }
     }
 
-    data object StateKey : RenderContext.StableKey<State> {
-        override val default: State = State.NONE
-    }
-
-    enum class State {
-        TALKING,
-        ON_ELEVATOR,
-        NONE
-    }
-
-    class TestNpc : NpcPlayer("test"), TalkingInteractable {
-        init {
-            aiGroups.clear()
-            val group = EntityAIGroupBuilder()
-                .addTargetSelector(ClosestEntityTarget(this, 5.0) { it is RoguelikePlayer })
-                .build()
-            addAIGroup(group)
-        }
-
+    class TestNpc : NpcPlayer("test") {
         override val conversation: Conversation = conversation(username.asComponent()) {
+            interrupt("WHAT THE".asComponent())
             say("hello there".asComponent())
             response("hi".asComponent()) {
                 say("How are you".asComponent())

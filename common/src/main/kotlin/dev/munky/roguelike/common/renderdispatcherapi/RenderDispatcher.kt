@@ -152,7 +152,7 @@ internal object RenderDispatcher {
 
         fun debugHandle(handle: Int): String {
             val index = handle.getIndex()
-            return "Handle{ind=$index,slot#=${handle.getSlotCount()}},Dispatcher{slot#=${slotCounts.getOrNull(index)?.toInt() ?: "null"},context=${contexts[index].let { if (it == null) "null" else "exists" }}"
+            return "Handle{ind=$index,slot#=${handle.getSlotCount()}},Dispatcher{slot#=${slotCounts.getOrNull(index)?.toInt() ?: "null"},context=${contexts[index].let { if (it == null) "null" else "exists" }}}"
         }
 
         companion object {
