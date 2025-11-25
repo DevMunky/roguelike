@@ -1,8 +1,10 @@
 package dev.munky.roguelike.server.instance.mainmenu
 
+import dev.munky.roguelike.server.instance.RoguelikeInstance
 import net.minestom.server.MinecraftServer
 import net.minestom.server.instance.InstanceContainer
 import net.minestom.server.instance.LightingChunk
+import net.minestom.server.instance.SharedInstance
 import net.minestom.server.instance.block.Block
 import net.minestom.server.registry.RegistryKey
 import net.minestom.server.world.DimensionType
@@ -11,7 +13,7 @@ import java.util.*
 /**
  * Per-player instance where players can select a character or create a new one, then transfer to town.
  */
-class MainMenuInstance private constructor() : InstanceContainer(UUID.randomUUID(), MENU_DIMENSION_KEY) {
+class MainMenuInstance private constructor() : RoguelikeInstance(UUID.randomUUID(), MENU_DIMENSION_KEY) {
     init {
         chunkSupplier = { i, x, z ->
             LightingChunk(i, x, z)

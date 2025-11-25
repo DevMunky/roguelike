@@ -4,6 +4,7 @@ import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.interact.Conversation
+import dev.munky.roguelike.server.interact.InteractableArea
 import kotlinx.serialization.Serializable
 import net.minestom.server.entity.Player
 import net.minestom.server.network.player.GameProfile
@@ -19,6 +20,11 @@ class RoguelikePlayer(connection: PlayerConnection, profile: GameProfile) : Play
     val account = Roguelike.server().accounts()[uuid.toString()] ?: AccountData(username, HashSet())
     var currentCharacter = account.characters.firstOrNull()
 
+    val areasInside = HashSet<InteractableArea>()
+
+    override fun spawn() {
+        areasInside.clear()
+    }
 }
 
 @Serializable

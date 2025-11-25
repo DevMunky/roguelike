@@ -22,6 +22,7 @@ import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
 import net.minestom.server.event.player.PlayerChatEvent
 import net.minestom.server.event.player.PlayerMoveEvent
+import org.joml.Quaternionf
 import java.util.*
 
 interface TalkingInteractable : Interactable {
@@ -125,8 +126,7 @@ object ConversationRenderer : Renderer {
             eventNode.addListener(PlayerMoveEvent::class.java) { e ->
                 val look = e.newPosition.direction()
                 val straight = origin.sub(e.newPosition).asVec().normalize()
-                val dif = straight.sub(look)
-                val dist = dif.lengthSquared()
+                val dist = straight.sub(look).lengthSquared()
                 when {
                     dist < 0.2 -> player.fieldViewModifier = 3f
                     dist >= 3 -> {
