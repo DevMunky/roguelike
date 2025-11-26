@@ -1,13 +1,7 @@
 package dev.munky.roguelike.server.player
 
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
-import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
-import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
-import dev.munky.roguelike.common.renderdispatcherapi.Renderer
-import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.Roguelike
-import dev.munky.roguelike.server.instance.RoguelikeInstance
-import dev.munky.roguelike.server.instance.mainmenu.MainMenuRenderer
 import dev.munky.roguelike.server.interact.InteractableArea
 import kotlinx.serialization.Serializable
 import net.minestom.server.entity.Player

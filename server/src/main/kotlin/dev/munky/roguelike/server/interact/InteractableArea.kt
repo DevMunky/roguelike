@@ -21,9 +21,10 @@ import net.minestom.server.particle.Particle
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import java.time.Duration
+import java.time.Instant
 import kotlin.time.toJavaDuration
 
-sealed interface Shape {
+interface Shape {
     fun expand(amount: Double) : Shape
     fun contains(p: Vector3dc) : Boolean
 
@@ -68,18 +69,12 @@ data class InteractableArea(
      * has a little buffer between exiting after entry.
      */
     val thickness: Double = 2.0,
-
-    /**
-    * The time it between entering the area and [onEnter] being called.
-     */
-    val onEnterCooldown: Duration,
     val onExit: (RoguelikePlayer) -> Unit = {},
     val onEnter: (RoguelikePlayer) -> Unit = {}
 ) {
     class Dsl {
         private var shape: Shape? = null
         private var thickness: Double = 1.0
-        private var onEnterCooldown: Duration? = null
         private var onExit: (RoguelikePlayer) -> Unit = {}
         private var onEnter: (RoguelikePlayer) -> Unit = {}
 
@@ -92,9 +87,6 @@ data class InteractableArea(
         fun thickness(thickness: Double) {
             this.thickness = thickness
         }
-        fun bufferTime(duration: kotlin.time.Duration) {
-            this.onEnterCooldown = duration.toJavaDuration()
-        }
         fun onExit(block: (RoguelikePlayer) -> Unit) {
             onExit = block
         }
@@ -104,8 +96,7 @@ data class InteractableArea(
 
         fun build() : InteractableArea {
             val a = shape ?: error("No area defined!")
-            val b = onEnterCooldown ?: error("No buffer time defined!")
-            return InteractableArea(a, thickness, b, onExit, onEnter)
+            return InteractableArea(a, thickness, onExit, onEnter)
         }
     }
 
@@ -175,7 +166,7 @@ data class InteractableArea(
                                         var x = shape.min.x()
                                         val zs = (shape.max.z() - shape.min.z()) / step
                                         var z = shape.min.z()
-                                        repeat(step) { yi ->
+                                        repeat(step) {
                                             particle(p, shape.max.x(), y, shape.min.z())
                                             particle(p, shape.max.x(), y, shape.max.z())
                                             particle(p, shape.min.x(), y, shape.min.z())
