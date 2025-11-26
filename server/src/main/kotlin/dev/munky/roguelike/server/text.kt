@@ -1,6 +1,7 @@
 package dev.munky.roguelike.server
 
 import kotlinx.serialization.json.JsonNamingStrategy
+import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.PatternReplacementResult
 import net.kyori.adventure.text.TextComponent
@@ -13,6 +14,8 @@ import net.minestom.server.MinecraftServer
 import org.slf4j.Logger
 import java.util.regex.MatchResult
 import kotlin.text.iterator
+
+fun String.roguelikeKey() : Key = Key.key(Roguelike.NAMESPACE, this)
 
 fun text(content: String): Component = Component.text(content)
 

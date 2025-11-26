@@ -12,6 +12,9 @@ import dev.munky.roguelike.server.player.AccountData
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import dev.munky.roguelike.server.store.DynamicResourceStore
 import dev.munky.roguelike.server.store.DynamicResourceStoreImpl
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
@@ -19,7 +22,7 @@ import net.minestom.server.ServerProcess
 import kotlin.io.path.Path
 
 class Roguelike private constructor() {
-    lateinit var mc: MinecraftServer
+    private lateinit var mc: MinecraftServer
     fun process() : ServerProcess = MinecraftServer.process()
 
     private val modelPlatform = ModelPlatform.register(MinestomModelPlatform())
@@ -66,6 +69,17 @@ class Roguelike private constructor() {
      */
     fun init(auth: Auth) {
         mc = MinecraftServer.init(auth)
+        ourInit()
+        minecraftInit()
+    }
+
+    fun ourInit() = runBlocking {
+        withContext(Dispatchers.IO) {
+            accounts().load()
+        }
+    }
+
+    fun minecraftInit() {
         MinecraftServer.setBrandName("roguelike")
         MinecraftServer.getConnectionManager().setPlayerProvider(::RoguelikePlayer)
         MinecraftServer.getDimensionTypeRegistry().register("${NAMESPACE}:main_menu", MENU_DIMENSION)
@@ -79,6 +93,7 @@ class Roguelike private constructor() {
     }
 
     fun start(host: String, port: Int) {
+        if (!::mc.isInitialized) error("Call Roguelike.init() before starting the server.")
         mc.start(host, port)
     }
 

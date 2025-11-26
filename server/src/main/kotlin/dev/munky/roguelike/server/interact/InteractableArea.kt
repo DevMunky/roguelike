@@ -6,11 +6,7 @@ import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.interact.InteractableArea.Dsl
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import dev.munky.roguelike.server.toJoml
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import net.minestom.server.MinecraftServer
 import net.minestom.server.color.Color
 import net.minestom.server.event.EventFilter
@@ -20,9 +16,6 @@ import net.minestom.server.network.packet.server.play.ParticlePacket
 import net.minestom.server.particle.Particle
 import org.joml.Vector3d
 import org.joml.Vector3dc
-import java.time.Duration
-import java.time.Instant
-import kotlin.time.toJavaDuration
 
 interface Shape {
     fun expand(amount: Double) : Shape

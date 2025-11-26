@@ -3,6 +3,9 @@ package dev.munky.roguelike.server.player
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.interact.InteractableArea
+import dev.munky.roguelike.server.item.ModifierFlameBurst
+import dev.munky.roguelike.server.item.Weapon
+import dev.munky.roguelike.server.item.WeaponInstance
 import kotlinx.serialization.Serializable
 import net.minestom.server.entity.Player
 import net.minestom.server.network.player.GameProfile
@@ -17,13 +20,16 @@ class RoguelikePlayer(connection: PlayerConnection, profile: GameProfile) : Play
 
     var isDebug = true
 
-    val account = Roguelike.server().accounts()[uuid.toString()] ?: AccountData(username, HashSet())
-    var currentCharacter = account.characters.firstOrNull()
+    val account = Roguelike.server().accounts()[uuid.toString()] ?: AccountData.new(this)
+
+    var currentCharacter = CharacterInstance(account.characters.first())
 
     val areasInside = HashSet<InteractableArea>()
 
     override fun spawn() {
         areasInside.clear()
+        val item = currentCharacter.weapon.buildItem()
+        inventory.setItemStack(0, item)
     }
 
     companion object : RenderContext.Key<RoguelikePlayer>
@@ -37,13 +43,19 @@ data class AccountData(
     val characters: Set<Character>
 ) {
     companion object {
-        val EMPTY = AccountData("", HashSet())
+        fun new(player: RoguelikePlayer) = AccountData(player.username, hashSetOf(
+            Character(Weapon(Weapon.CombatStyle.SWORD, setOf(ModifierFlameBurst)))
+        ))
     }
 }
 
 @Serializable
 data class Character(
-    val combat: CombatStyle
+    val weapon: Weapon
 ) {
-    enum class CombatStyle { SWORD, SPELL }
+
+}
+
+class CharacterInstance(val data: Character) {
+    val weapon = WeaponInstance(data.weapon)
 }
