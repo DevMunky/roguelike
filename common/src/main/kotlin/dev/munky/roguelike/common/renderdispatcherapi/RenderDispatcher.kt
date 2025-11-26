@@ -1,6 +1,7 @@
 package dev.munky.roguelike.common.renderdispatcherapi
 
 import dev.munky.roguelike.common.logger
+import dev.munky.roguelike.common.renderdispatcherapi.InternalRenderContext.Companion.INVALID_HANDLE
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.FlowCollector
 import kotlin.coroutines.CoroutineContext
@@ -8,7 +9,7 @@ import kotlin.coroutines.CoroutineContext
 @Volatile var startDisposalsBlocking = false
 
 /**
- * Creates the Rendering coroutine scope.
+ * Manages all context lifetimes, distributes handles, and renders dispatches.
  */
 internal object RenderDispatcher {
     private val LOGGER = logger {}
@@ -23,7 +24,29 @@ internal object RenderDispatcher {
         if (!rootScope.isActive) throw IllegalStateException("Root scope is not active.", rootScope.coroutineContext[Job]!!.getCancellationException())
 
         val data = dispatch.data
-        val renderer = data[Renderer.Companion] as Renderer?
+        val renderer = data[Renderer] as Renderer?
+        val parent = dispatch.parentContext
+
+        if (parent != null) {
+            if (parent !is RenderContextImpl) error("Forking RenderContexts may only be done from within a Renderer.")
+            val ctx = RenderContextImpl(parent, dispatch.data)
+
+            val handle = contexts.add(ctx)
+
+            if (renderer != null) {
+                parent.onDispose {
+                    ctx.dispose()
+                }
+                ctx.launch {
+                    // This is to enable the nice abstract extension function for Renderers.
+                    with (renderer) {
+                        ctx.render()
+                    }
+                }
+            }
+
+            return handle
+        }
 
         val ctx = RenderContextImpl(
             data,
@@ -83,6 +106,7 @@ internal object RenderDispatcher {
         }
 
         fun remove(handle: Int): InternalRenderContext? {
+            if (handle == INVALID_HANDLE) error("Invalid handle.")
             val ind = validHandleOf(handle)?.getIndex() ?: return null
             val r = contexts[ind]
             contexts[ind] = null
@@ -151,8 +175,15 @@ internal object RenderDispatcher {
         }
 
         fun debugHandle(handle: Int): String {
+            if (handle == INVALID_HANDLE) return "Handle{INVALID_HANDLE}"
+            if (handle == EMPTY_HANDLE) return "Handle{EMPTY_HANDLE}"
             val index = handle.getIndex()
-            return "Handle{ind=$index,slot#=${handle.getSlotCount()}},Dispatcher{slot#=${slotCounts.getOrNull(index)?.toInt() ?: "null"},context=${contexts[index].let { if (it == null) "null" else "exists" }}}"
+            return "Handle{" +
+                    "ind=$index," +
+                    "slot=${handle.getSlotCount()}}," +
+                    "dispatcher{slot=${slotCounts.getOrNull(index)?.toInt() ?: "null"}," +
+                    "context=${contexts[index].let { if (it == null) "null" else "exists" }}" +
+                    "}"
         }
 
         companion object {

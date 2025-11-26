@@ -8,6 +8,7 @@ import dev.munky.modelrenderer.skeleton.Model
 import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuRenderer
+import dev.munky.roguelike.server.player.RoguelikePlayer
 import kotlinx.coroutines.delay
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
@@ -16,6 +17,7 @@ import net.minestom.server.coordinate.Vec
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityType
 import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
+import net.minestom.server.event.player.PlayerDisconnectEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.event.server.ServerTickMonitorEvent
 import net.minestom.server.instance.Instance
@@ -41,16 +43,12 @@ suspend fun main(vararg args: String) {
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(AsyncPlayerConfigurationEvent::class.java) {
-        it.player.respawnPoint = Pos(0.0, -44.5, 0.0)
+        it.player.respawnPoint = Pos(0.0, .1, 0.0)
         it.spawningInstance = MainMenuInstance.create()
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent::class.java) {
         it.player.isAllowFlying = true
-        if (it.player.instance is MainMenuInstance) RenderDispatch
-            .with(MainMenuRenderer)
-            .with(RenderKey.Player, it.player)
-            .dispatch()
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(ServerTickMonitorEvent::class.java) {

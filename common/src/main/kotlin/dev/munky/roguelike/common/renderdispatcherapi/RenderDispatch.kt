@@ -7,7 +7,9 @@ package dev.munky.roguelike.common.renderdispatcherapi
  *
  * Specific ones should be declared in the respective [Renderer].
  */
-class RenderDispatch private constructor() {
+class RenderDispatch private constructor(
+    internal val parentContext: RenderContext? = null
+) {
     private val _data = mutableMapOf<RenderContext.Key<*>, Any>()
     val data get() = _data.toMap()
 
@@ -22,6 +24,11 @@ class RenderDispatch private constructor() {
     fun dispatch(): RenderHandle = RenderDispatcher.dispatch(this)
 
     companion object {
+        /**
+         * If you create a RenderDispatch from within the scope of RenderContext,
+         * that RenderContext becomes the parent scope for that RenderDispatch.
+         */
         fun <T: Renderer> with(e: T): RenderDispatch = RenderDispatch().with(e)
+        fun <T: Renderer> RenderContext.with(e: T) : RenderDispatch = RenderDispatch(this).with(e)
     }
 }

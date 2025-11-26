@@ -1,5 +1,6 @@
 package dev.munky.roguelike.server.interact
 
+import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Player
@@ -17,15 +18,12 @@ interface Interactable {
     fun onInteract(player: RoguelikePlayer)
 
     companion object {
-        val EVENT_NODE: EventNode<PlayerEvent> = EventNode.type("roguelike:interactable", EventFilter.PLAYER)
+        val EVENT_NODE: EventNode<PlayerEvent> = EventNode.type("${Roguelike.NAMESPACE}:interactable", EventFilter.PLAYER)
 
-        fun registerEvents() {
+        fun initialize() {
             EVENT_NODE.addListener(PlayerEntityInteractEvent::class.java) {
                 if (it.hand != PlayerHand.MAIN) return@addListener
                 tryInteract(it.player, it.target)
-            }
-            EVENT_NODE.addListener(PlayerSpawnEvent::class.java) {
-                tryInteract(it.player, it.instance)
             }
             EVENT_NODE.addListener(PlayerSpawnEvent::class.java) {
                 tryInteract(it.player, it.instance)

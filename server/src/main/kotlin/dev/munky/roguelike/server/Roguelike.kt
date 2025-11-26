@@ -2,6 +2,8 @@ package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.helpCommand
+import dev.munky.roguelike.server.instance.InstanceManager
+import dev.munky.roguelike.server.instance.RoguelikeInstance
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance.Companion.MENU_DIMENSION
 import dev.munky.roguelike.server.interact.Interactable
 import dev.munky.roguelike.server.interact.InteractableArea
@@ -25,6 +27,9 @@ class Roguelike private constructor() {
 
     private val terminal = MinestomCommandTerminal()
     fun terminal() : MinestomCommandTerminal = terminal
+
+    private val instanceManager = InstanceManager()
+    fun instanceManager() = instanceManager
 
     private val accountStore = DynamicResourceStoreImpl(AccountData.serializer(), Json {
         prettyPrint = true
@@ -63,11 +68,14 @@ class Roguelike private constructor() {
         mc = MinecraftServer.init(auth)
         MinecraftServer.setBrandName("roguelike")
         MinecraftServer.getConnectionManager().setPlayerProvider(::RoguelikePlayer)
-        MinecraftServer.getDimensionTypeRegistry().register("${Roguelike.NAMESPACE}:main_menu", MENU_DIMENSION)
+        MinecraftServer.getDimensionTypeRegistry().register("${NAMESPACE}:main_menu", MENU_DIMENSION)
+
         registerCommands()
-        Interactable.registerEvents()
+
+        Interactable.initialize()
         InteractableArea.initialize()
-        RoguelikeItem.registerEvents()
+        RoguelikeItem.initialize()
+        RoguelikeInstance.initialize()
     }
 
     fun start(host: String, port: Int) {

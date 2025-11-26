@@ -3,6 +3,7 @@ package dev.munky.roguelike.server.instance.town
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.RenderKey
+import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.interact.Conversation
 import dev.munky.roguelike.server.interact.NpcPlayer
@@ -16,8 +17,9 @@ import net.minestom.server.entity.ai.target.ClosestEntityTarget
 
 object TownRenderer : Renderer {
     override suspend fun RenderContext.render() {
-        val player = require(RenderKey.Player)
+        val player = require(RoguelikePlayer)
         val town = player.instance as? TownInstance ?: return
+
         val npc = TestNpc()
 
         npc.isAutoViewable = false
@@ -31,9 +33,10 @@ object TownRenderer : Renderer {
 
     class TestNpc : NpcPlayer("test") {
         override val conversation: Conversation = conversation(username.asComponent()) {
-            interrupt("WHAT THE".asComponent())
+            interrupt("Alright then.".asComponent())
             say("hello there".asComponent())
             response("hi".asComponent()) {
+                interrupt("NOW you don't want to talk?".asComponent())
                 say("How are you".asComponent())
                 response("bad".asComponent()) {
                     execute {

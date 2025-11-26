@@ -1,7 +1,7 @@
 package dev.munky.roguelike.common.renderdispatcherapi
 
 interface Renderer: RenderContext.Element {
-    override val key get() = Companion
+    override val key : RenderContext.Key<*> get() = Companion
     suspend fun RenderContext.render()
 
     companion object : RenderContext.Key<Renderer>

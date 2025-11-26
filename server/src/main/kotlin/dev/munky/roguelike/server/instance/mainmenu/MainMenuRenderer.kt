@@ -3,11 +3,11 @@ package dev.munky.roguelike.server.instance.mainmenu
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
-import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.Roguelike
-import dev.munky.roguelike.server.instance.town.TownInstance
 import dev.munky.roguelike.server.instance.town.TownRenderer
+import dev.munky.roguelike.server.player.RoguelikePlayer
 import dev.munky.roguelike.server.raycast.Ray
+import kotlinx.coroutines.future.asDeferred
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityType
@@ -16,22 +16,22 @@ import net.minestom.server.entity.attribute.AttributeModifier
 import net.minestom.server.entity.attribute.AttributeOperation
 import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
-import net.minestom.server.event.player.PlayerBlockInteractEvent
 import net.minestom.server.event.player.PlayerEntityInteractEvent
 import net.minestom.server.event.player.PlayerMoveEvent
-import net.minestom.server.event.player.PlayerUseItemEvent
 
 object MainMenuRenderer : Renderer {
-    private val ATTRIBUTE_MOD = AttributeModifier("roguelike:main_menu_interact", 10.0, AttributeOperation.ADD_VALUE)
+    private val INTERACT_ATTR = AttributeModifier("${Roguelike.NAMESPACE}:main_menu_interact", 10.0, AttributeOperation.ADD_VALUE)
+    private val SPEED_ATTR = AttributeModifier("${Roguelike.NAMESPACE}:main_menu_speed", .0, AttributeOperation.ADD_MULTIPLIED_TOTAL)
 
     override suspend fun RenderContext.render() {
-        val player = require(RenderKey.Player)
+        val player = require(RoguelikePlayer)
         val mainMenu = player.instance as? MainMenuInstance ?: return
 
         val eventNode = EventNode.event("${Roguelike.NAMESPACE}:main_menu_renderer.${player.username}", EventFilter.PLAYER) { it.player == player }
         MinecraftServer.getGlobalEventHandler().addChild(eventNode)
 
-        player.getAttribute(Attribute.fromKey("entity_interaction_range")).addModifier(ATTRIBUTE_MOD)
+        player.getAttribute(Attribute.fromKey("entity_interaction_range")).addModifier(INTERACT_ATTR)
+        player.getAttribute(Attribute.fromKey("movement_speed")).addModifier(SPEED_ATTR)
 
         val selectCharacterEntity = Entity(EntityType.VILLAGER)
         val createCharacterEntity = Entity(EntityType.VILLAGER)
@@ -62,11 +62,7 @@ object MainMenuRenderer : Renderer {
         watchAndRequire(SelectedOption) {
             when (it) {
                 Option.SELECT_CHARACTER -> {
-                    player.setInstance(TownInstance.create()).whenComplete { _, _ ->
-                        RenderDispatch.with(TownRenderer)
-                            .with(RenderKey.Player, player)
-                            .dispatch()
-                    }
+                    player.setInstance(Roguelike.server().instanceManager().town).asDeferred().join()
                     dispose()
                 }
                 Option.CREATE_CHARACTER -> {
@@ -84,6 +80,9 @@ object MainMenuRenderer : Renderer {
         }
 
         onDispose {
+            player.getAttribute(Attribute.fromKey("entity_interaction_range")).removeModifier(INTERACT_ATTR)
+            player.getAttribute(Attribute.fromKey("movement_speed")).removeModifier(SPEED_ATTR)
+
             createCharacterEntity.remove()
             selectCharacterEntity.remove()
             MinecraftServer.getGlobalEventHandler().removeChild(eventNode)

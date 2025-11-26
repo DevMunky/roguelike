@@ -1,10 +1,10 @@
 package dev.munky.roguelike.server.instance.mainmenu
 
+import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.server.instance.RoguelikeInstance
+import dev.munky.roguelike.server.player.RoguelikePlayer
 import net.minestom.server.MinecraftServer
-import net.minestom.server.instance.InstanceContainer
 import net.minestom.server.instance.LightingChunk
-import net.minestom.server.instance.SharedInstance
 import net.minestom.server.instance.block.Block
 import net.minestom.server.registry.RegistryKey
 import net.minestom.server.world.DimensionType
@@ -19,8 +19,14 @@ class MainMenuInstance private constructor() : RoguelikeInstance(UUID.randomUUID
             LightingChunk(i, x, z)
         }
         setGenerator {
-            it.modifier().fillHeight(-64, -45, Block.BLACK_CONCRETE)
+            it.modifier().fillHeight(-64, 0, Block.BLACK_CONCRETE)
         }
+    }
+
+    override fun onEnter(player: RoguelikePlayer) {
+        RenderDispatch.with(MainMenuRenderer)
+            .with(player)
+            .dispatch()
     }
 
     companion object {

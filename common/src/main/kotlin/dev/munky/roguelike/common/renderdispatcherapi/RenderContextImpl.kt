@@ -1,13 +1,18 @@
 package dev.munky.roguelike.common.renderdispatcherapi
 
 import dev.munky.roguelike.common.logger
+import dev.munky.roguelike.common.renderdispatcherapi.InternalRenderContext.Companion.INVALID_HANDLE
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.cancel
+import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.newCoroutineContext
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
@@ -15,18 +20,32 @@ import kotlin.coroutines.cancellation.CancellationException
 
 @Suppress("UNCHECKED_CAST")
 internal data class RenderContextImpl(
-    override val coroutineContext: CoroutineContext
+    override val coroutineContext: CoroutineContext,
+    private val data: ConcurrentHashMap<RenderContext.Key<*>, MutableSharedFlow<*>> = ConcurrentHashMap(),
+    private var disposer: (suspend () -> Unit)? = null,
+    override var rawHandle: Int = INVALID_HANDLE
 ): InternalRenderContext {
+    constructor(
+        parent: RenderContextImpl,
+        additionalData: Map<RenderContext.Key<*>, *>,
+    ) : this(
+        parent.coroutineContext + Job(),
+        parent.data
+    ) {
+        for((key, value) in additionalData){
+            val p = data[key]
+            if (p == null) data[key] = createFlow(value)
+            else (p as MutableSharedFlow<Any?>).tryEmit(value)
+        }
+
+    }
+
     constructor(
         initialData: Map<RenderContext.Key<*>, *>,
         coroutineContext: CoroutineContext
     ) : this(coroutineContext) {
         for((key, value) in initialData) data[key] = createFlow(value)
     }
-
-    override var rawHandle: Int = 0
-    private val data = ConcurrentHashMap<RenderContext.Key<*>, MutableSharedFlow<*>>()
-    private var disposer: (suspend () -> Unit)? = null
 
     // Both values and collectors are stored in the MutableSharedFlow
     private fun <T> createFlow(value:T): MutableSharedFlow<T> = MutableSharedFlow<T>(
@@ -40,9 +59,9 @@ internal data class RenderContextImpl(
         tryEmit(value)
     }
 
-    private fun <T> getFlow(key: RenderContext.Key<T>): MutableSharedFlow<T?> = data.computeIfAbsent(key) { createFlow(null) } as MutableSharedFlow<T?>
+    private fun <T> getFlow(key: RenderContext.Key<T>): MutableSharedFlow<T?> = data.getOrPut(key) { createFlow(null) } as MutableSharedFlow<T?>
 
-    private fun <T> getFlow(key: RenderContext.StableKey<T>): MutableSharedFlow<T> = data.computeIfAbsent(key) { createFlow(key.default) } as MutableSharedFlow<T>
+    private fun <T> getFlow(key: RenderContext.StableKey<T>): MutableSharedFlow<T> = data.getOrPut(key) { createFlow(key.default) } as MutableSharedFlow<T>
 
     override operator fun <T> get(key: RenderContext.Key<T>): T? = data[key]?.replayCache?.firstOrNull() as T?
 
@@ -56,8 +75,12 @@ internal data class RenderContextImpl(
     override fun <T> require(key: RenderContext.Key<T>): T = get(key) ?: error("Key '$key' was required for rendering yet was not present in render context.")
 
     override fun onDispose(block: suspend () -> Unit) {
-        if (disposer != null) error("Multiple disposal blocks declared, condense them to one block.")
-        disposer = block
+        disposer = disposer?.let {
+            {
+                it()
+                block()
+            }
+        } ?: block
     }
 
     override fun dispose() = RenderDispatcher.dispose(rawHandle)
