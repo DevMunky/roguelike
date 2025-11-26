@@ -32,7 +32,6 @@ class TownInstance private constructor() : RoguelikeInstance(UUID.randomUUID(), 
                 Vector3d(1.0).mul(2.0).add(origin),
                 Vector3d(1.0).mul(-2.0).add(origin)
             )
-            bufferTime(3.seconds)
             thickness(.5)
             onExit {
                 it.sendMessage("Exited cuboid")
@@ -46,7 +45,6 @@ class TownInstance private constructor() : RoguelikeInstance(UUID.randomUUID(), 
                 Vector3d(-5.0, .0, -5.0).add(origin),
                 4.0
             )
-            bufferTime(3.seconds)
             thickness(.5)
             onExit {
                 it.sendMessage("Exited sphere")
