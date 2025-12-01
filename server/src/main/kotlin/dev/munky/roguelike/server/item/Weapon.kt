@@ -1,12 +1,14 @@
 package dev.munky.roguelike.server.item
 
 import dev.munky.roguelike.server.instance.RoguelikeInstance
-import dev.munky.roguelike.server.item.RoguelikeItem.Companion.TAG
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import kotlinx.serialization.Serializable
+import net.minestom.server.component.DataComponents
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
+import net.minestom.server.item.component.UseCooldown
 import net.minestom.server.tag.Tag
+import java.util.UUID
 
 @Serializable
 data class Weapon(
@@ -20,22 +22,28 @@ data class Weapon(
 }
 
 data class WeaponInstance(val data: Weapon) : RoguelikeItem {
+    override val uuid: UUID = UUID.randomUUID()
+
     val modifiers = data.modifiers.map { it.create(this) }
 
     override fun onRightClick(player: RoguelikePlayer, target: RoguelikeItem.InteractTarget) {}
     override fun onLeftClick(player: RoguelikePlayer) {
         val instance = player.instance as? RoguelikeInstance ?: return
         val ctx = AttackContext(instance, player)
-        modifiers.forEach {
-            it.attack(ctx)
+        modifiers.sorted().forEach { mod ->
+            repeat(mod.modifier.count) {
+                mod.attack(ctx)
+            }
         }
         ctx.attack()
     }
 
     override fun buildItem(): ItemStack {
         val base = ItemStack.builder(Material.PAPER)
+            .set(DataComponents.USE_COOLDOWN, UseCooldown(modifiers.size.toFloat() * 1.5f, "weapon.cooldown"))
             .itemModel(data.style.itemModel).build()
-        RoguelikeItem.MAP[base] = this
-        return modifiers.fold(base) { acc, modifier -> modifier.decorate(acc) }
+        val final = modifiers.fold(base) { acc, modifier -> modifier.decorate(acc) }
+        RoguelikeItem.MAP[final] = this
+        return final
     }
 }

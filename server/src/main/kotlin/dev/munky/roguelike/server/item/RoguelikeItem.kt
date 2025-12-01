@@ -4,17 +4,22 @@ import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.player.RoguelikePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.PlayerHand
+import net.minestom.server.event.Event
 import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
 import net.minestom.server.event.player.PlayerBlockInteractEvent
 import net.minestom.server.event.player.PlayerEntityInteractEvent
 import net.minestom.server.event.player.PlayerHandAnimationEvent
 import net.minestom.server.event.trait.ItemEvent
+import net.minestom.server.event.trait.PlayerEvent
 import net.minestom.server.item.ItemStack
 import net.minestom.server.tag.Tag
+import java.util.UUID
 import java.util.WeakHashMap
 
 sealed interface RoguelikeItem {
+    val uuid: UUID
+
     fun onLeftClick(player: RoguelikePlayer)
     fun onRightClick(player: RoguelikePlayer, target: InteractTarget)
 
@@ -30,9 +35,9 @@ sealed interface RoguelikeItem {
     companion object {
         val MAP = WeakHashMap<ItemStack, RoguelikeItem>()
 
-        val EVENT_NODE = EventNode.all("${Roguelike.NAMESPACE}:item.events")
-        val PLAYER_EVENT_NODE = EventNode.type("${Roguelike.NAMESPACE}:weapon.events.player", EventFilter.PLAYER)
-        val ITEM_EVENT_NODE = EventNode.type("${Roguelike.NAMESPACE}:weapon.events.item", EventFilter.ITEM)
+        val EVENT_NODE: EventNode<Event> = EventNode.all("${Roguelike.NAMESPACE}:item.events")
+        val PLAYER_EVENT_NODE: EventNode<PlayerEvent> = EventNode.type("${Roguelike.NAMESPACE}:weapon.events.player", EventFilter.PLAYER)
+        val ITEM_EVENT_NODE: EventNode<ItemEvent> = EventNode.type("${Roguelike.NAMESPACE}:weapon.events.item", EventFilter.ITEM)
 
         fun initialize() {
             PLAYER_EVENT_NODE.addListener(PlayerHandAnimationEvent::class.java) {

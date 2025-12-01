@@ -10,16 +10,38 @@ import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.LivingEntity
 import net.minestom.server.item.ItemStack
+import java.awt.Component
 
+/**
+ * State that must persist between weapon iterations
+ * or player sessions goes here (serialized data).
+ */
 @Serializable
 sealed interface Modifier {
     val id: Key
+    val genre: Genre
+    val count: Int
+
     fun create(weapon: WeaponInstance) : ModifierInstance
+
+    enum class Genre {
+        PRIMARILY_APPEND, // first in the modifier list
+        PRIMARILY_MODIFY, // second and so on
+    }
 }
 
-sealed class ModifierInstance(val modifier: Modifier) {
+/**
+ * Runtime state is stored here
+ */
+abstract class ModifierInstance : Comparable<ModifierInstance> {
+    abstract val modifier: Modifier
+
     abstract fun decorate(ctx: ItemStack) : ItemStack
     abstract fun attack(ctx: AttackContext)
+
+    override fun compareTo(other: ModifierInstance): Int {
+        return modifier.genre.compareTo(other.modifier.genre)
+    }
 
     fun entitiesInFront(instance: RoguelikeInstance, position: Pos, fov: Double, dist: Double) : List<LivingEntity> {
         val look = position.direction()
@@ -34,11 +56,13 @@ sealed class ModifierInstance(val modifier: Modifier) {
     }
 }
 
-object ModifierFlameBurst : Modifier {
+@Serializable
+data class ModifierFlameBurst(override val count: Int) : Modifier {
     override val id = "modifier.flame".roguelikeKey()
-    override fun create(weapon: WeaponInstance): ModifierInstance = Instance()
+    override val genre = Modifier.Genre.PRIMARILY_APPEND
+    override fun create(weapon: WeaponInstance): ModifierInstance = Instance(this)
 
-    class Instance : ModifierInstance(ModifierFlameBurst) {
+    class Instance(override val modifier: Modifier) : ModifierInstance() {
         override fun decorate(ctx: ItemStack): ItemStack {
             val lore = ctx.get(DataComponents.LORE)?.let { ArrayList(it) } ?: arrayListOf()
             lore += "<red>Makes flame".asComponent()

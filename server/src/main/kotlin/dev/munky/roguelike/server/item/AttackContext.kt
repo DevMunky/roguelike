@@ -24,8 +24,8 @@ sealed interface AttackCommand {
     fun execute(instance: RoguelikeInstance, player: RoguelikePlayer)
 
     fun spawnParticlesAround(instance: RoguelikeInstance, entity: LivingEntity, particle: Particle, amount: Int, speed: Float = 0f) {
-        val xz = entity.boundingBox.width() * 1.2
-        val y = entity.boundingBox.height() * 1.2
+        val xz = entity.boundingBox.width() * 1.05
+        val y = entity.boundingBox.height() * 1.05
         val particles = ArrayList<ParticlePacket>()
         repeat(amount) {
             particles += ParticlePacket(particle, entity.position, Vec(xz, y, xz), speed, 1)

@@ -29,8 +29,8 @@ class TownInstance private constructor() : RoguelikeInstance(UUID.randomUUID(), 
 
         createArea {
             cuboid(
-                Vector3d(1.0).mul(2.0).add(origin),
-                Vector3d(1.0).mul(-2.0).add(origin)
+                Vector3d(1.5).mul(2.0).add(origin),
+                Vector3d(1.5).mul(-2.0).add(origin)
             )
             thickness(.5)
             onExit {

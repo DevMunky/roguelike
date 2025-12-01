@@ -32,10 +32,10 @@ interface TalkingInteractable : Interactable {
     fun RenderDispatch.buildDispatch() {}
 
     override fun onInteract(player: RoguelikePlayer) {
-        onDialogueStart(player)
         RenderDispatch.with(ConversationRenderer)
             .with(conversation)
             .with(player)
+            .with(ConversationRenderer.OnStartFunction, ::onDialogueStart)
             .with(ConversationRenderer.OnEndFunction, ::onDialogueEnd)
             .apply {
                 buildDispatch()
@@ -77,6 +77,7 @@ abstract class TalkingEntityCreature(type: EntityType) : EntityCreature(type), T
 
 object ConversationRenderer : Renderer {
     data object OnEndFunction : RenderContext.Key<(RoguelikePlayer, EndState) -> Unit>
+    data object OnStartFunction : RenderContext.Key<(RoguelikePlayer) -> Unit>
     data object Origin : RenderContext.Key<Pos>
     data object Range : RenderContext.Key<Double>
 
@@ -107,7 +108,7 @@ object ConversationRenderer : Renderer {
             when (e) {
                 EndState.NOT_ENDED -> error("Conversation ended but no end state was set.")
                 EndState.INTERRUPTED -> speakerSays(player, c, c.interrupt)
-                EndState.COMPLETE -> player.sendMessage("Complete")
+                EndState.COMPLETE,
                 EndState.INVALID -> {}
             }
         }
@@ -119,6 +120,8 @@ object ConversationRenderer : Renderer {
                 return
             } else ongoingConversations[player.uuid] = require(Conversation)
         }
+
+        get(OnStartFunction)?.invoke(player)
 
         MinecraftServer.getGlobalEventHandler().addChild(eventNode)
 

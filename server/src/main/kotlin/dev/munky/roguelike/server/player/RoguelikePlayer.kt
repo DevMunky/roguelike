@@ -44,7 +44,7 @@ data class AccountData(
 ) {
     companion object {
         fun new(player: RoguelikePlayer) = AccountData(player.username, hashSetOf(
-            Character(Weapon(Weapon.CombatStyle.SWORD, setOf(ModifierFlameBurst)))
+            Character(Weapon(Weapon.CombatStyle.SWORD, setOf(ModifierFlameBurst(1))))
         ))
     }
 }

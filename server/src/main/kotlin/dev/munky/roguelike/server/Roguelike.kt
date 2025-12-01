@@ -2,6 +2,7 @@ package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.helpCommand
+import dev.munky.roguelike.server.command.spawnRandoms
 import dev.munky.roguelike.server.instance.InstanceManager
 import dev.munky.roguelike.server.instance.RoguelikeInstance
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance.Companion.MENU_DIMENSION
@@ -108,6 +109,7 @@ class Roguelike private constructor() {
             s.sendMessage("Unknown command '$c'.".asComponent())
         }
         MinecraftServer.getCommandManager().register(helpCommand())
+        MinecraftServer.getCommandManager().register(spawnRandoms())
     }
 
     companion object {
