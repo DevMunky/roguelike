@@ -1,6 +1,5 @@
 package dev.munky.roguelike.server.interact
 
-import dev.munky.roguelike.server.player.RoguelikePlayer
 import net.minestom.server.entity.*
 import net.minestom.server.network.packet.server.play.EntityMetaDataPacket
 import net.minestom.server.network.packet.server.play.PlayerInfoRemovePacket
@@ -13,7 +12,7 @@ abstract class NpcPlayer(
     val username: String,
     val skinTexture: String? = null,
     val skinSignature: String? = null
-) : TalkingEntityCreature(EntityType.PLAYER) {
+) : TalkingInteractableCreature(EntityType.PLAYER) {
     override fun updateNewViewer(player: Player) {
         val properties = ArrayList<PlayerInfoUpdatePacket.Property>()
         if (skinTexture != null && skinSignature != null) {

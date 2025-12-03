@@ -3,20 +3,26 @@ package dev.munky.roguelike.server
 import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.helpCommand
 import dev.munky.roguelike.server.command.spawnRandoms
+import dev.munky.roguelike.server.command.testDungeon
 import dev.munky.roguelike.server.instance.InstanceManager
-import dev.munky.roguelike.server.instance.RoguelikeInstance
+import dev.munky.roguelike.server.instance.RogueInstance
+import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
+import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSetData
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance.Companion.MENU_DIMENSION
 import dev.munky.roguelike.server.interact.Interactable
-import dev.munky.roguelike.server.interact.InteractableArea
-import dev.munky.roguelike.server.item.RoguelikeItem
+import dev.munky.roguelike.server.item.RogueItem
+import dev.munky.roguelike.server.item.modifier.ModifierData
 import dev.munky.roguelike.server.player.AccountData
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.player.RoguePlayer
 import dev.munky.roguelike.server.store.DynamicResourceStore
 import dev.munky.roguelike.server.store.DynamicResourceStoreImpl
+import dev.munky.roguelike.server.store.ResourceStore
+import dev.munky.roguelike.server.store.TransformingResourceStoreImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNamingStrategy
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.ServerProcess
@@ -35,11 +41,43 @@ class Roguelike private constructor() {
     private val instanceManager = InstanceManager()
     fun instanceManager() = instanceManager
 
-    private val accountStore = DynamicResourceStoreImpl(AccountData.serializer(), Json {
-        prettyPrint = true
-        encodeDefaults = true
-    }, Path("accounts/"))
+    private val accountStore = DynamicResourceStoreImpl(
+        AccountData.serializer(),
+        Json {
+            prettyPrint = true
+            namingStrategy = JsonNamingStrategy.SnakeCase
+            encodeDefaults = true
+        },
+        Path("account/"),
+        key = { it.uuid.toString() }
+    )
     fun accounts() : DynamicResourceStore<AccountData> = accountStore
+
+    private val modifierStore = DynamicResourceStoreImpl(
+        ModifierData.serializer(),
+        Json {
+            prettyPrint = true
+            namingStrategy = JsonNamingStrategy.SnakeCase
+        },
+        Path("modifier/"),
+        key = { it.id }
+    )
+
+    /**
+     * Contains all default Modifiers.
+     */
+    fun modifiers() : DynamicResourceStore<ModifierData> = modifierStore
+
+    private val roomSetStore = TransformingResourceStoreImpl(
+        RoomSetData.serializer(),
+        Json {
+            prettyPrint = true
+            namingStrategy = JsonNamingStrategy.SnakeCase
+        },
+        Path("roomset/"),
+        transform = { it.id to RoomSet.create(it) }
+    )
+    fun roomSets() : ResourceStore<RoomSet> = roomSetStore
 
     fun renderDistance(r: Int) {
         requireNotTooLate()
@@ -75,22 +113,22 @@ class Roguelike private constructor() {
     }
 
     fun ourInit() = runBlocking {
+        Interactable.initialize()
+        RogueItem.initialize()
+        RogueInstance.initialize()
         withContext(Dispatchers.IO) {
             accounts().load()
+            roomSets().load()
+            modifiers().load()
         }
     }
 
     fun minecraftInit() {
         MinecraftServer.setBrandName("roguelike")
-        MinecraftServer.getConnectionManager().setPlayerProvider(::RoguelikePlayer)
+        MinecraftServer.getConnectionManager().setPlayerProvider(::RoguePlayer)
         MinecraftServer.getDimensionTypeRegistry().register("${NAMESPACE}:main_menu", MENU_DIMENSION)
 
         registerCommands()
-
-        Interactable.initialize()
-        InteractableArea.initialize()
-        RoguelikeItem.initialize()
-        RoguelikeInstance.initialize()
     }
 
     fun start(host: String, port: Int) {
@@ -110,6 +148,7 @@ class Roguelike private constructor() {
         }
         MinecraftServer.getCommandManager().register(helpCommand())
         MinecraftServer.getCommandManager().register(spawnRandoms())
+        MinecraftServer.getCommandManager().register(testDungeon())
     }
 
     companion object {

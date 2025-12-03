@@ -1,13 +1,10 @@
 package dev.munky.roguelike.server.instance.mainmenu
 
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
-import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.Roguelike
-import dev.munky.roguelike.server.instance.town.TownRenderer
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.player.RoguePlayer
 import dev.munky.roguelike.server.raycast.Ray
-import kotlinx.coroutines.future.asDeferred
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityType
@@ -21,10 +18,10 @@ import net.minestom.server.event.player.PlayerMoveEvent
 
 object MainMenuRenderer : Renderer {
     private val INTERACT_ATTR = AttributeModifier("${Roguelike.NAMESPACE}:main_menu_interact", 10.0, AttributeOperation.ADD_VALUE)
-    private val SPEED_ATTR = AttributeModifier("${Roguelike.NAMESPACE}:main_menu_speed", .0, AttributeOperation.ADD_MULTIPLIED_TOTAL)
+    private val SPEED_ATTR = AttributeModifier("${Roguelike.NAMESPACE}:main_menu_speed", .001, AttributeOperation.ADD_MULTIPLIED_TOTAL)
 
     override suspend fun RenderContext.render() {
-        val player = require(RoguelikePlayer)
+        val player = require(RoguePlayer)
         val mainMenu = player.instance as? MainMenuInstance ?: return
 
         val eventNode = EventNode.event("${Roguelike.NAMESPACE}:main_menu_renderer.${player.username}", EventFilter.PLAYER) { it.player == player }
@@ -62,7 +59,7 @@ object MainMenuRenderer : Renderer {
         watchAndRequire(SelectedOption) {
             when (it) {
                 Option.SELECT_CHARACTER -> {
-                    player.setInstance(Roguelike.server().instanceManager().town).asDeferred().join()
+                    player.setInstance(Roguelike.server().instanceManager().town)
                     dispose()
                 }
                 Option.CREATE_CHARACTER -> {

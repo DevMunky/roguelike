@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory
 
 
 fun logger(f: ()->Unit) : Logger {
-    return logger(f::class.simpleName!!.split("$").first().sentenceCase())
+    return logger(f::class.simpleName!!.split("$").first())
 }
 
 fun logger(name: String) : Logger {

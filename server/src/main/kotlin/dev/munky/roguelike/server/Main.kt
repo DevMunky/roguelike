@@ -5,10 +5,7 @@ import ch.qos.logback.classic.joran.JoranConfigurator
 import ch.qos.logback.core.joran.spi.JoranException
 import dev.munky.modelrenderer.entity.ModelEntity
 import dev.munky.modelrenderer.skeleton.Model
-import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance
-import dev.munky.roguelike.server.instance.mainmenu.MainMenuRenderer
-import dev.munky.roguelike.server.player.RoguelikePlayer
 import kotlinx.coroutines.delay
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
@@ -17,7 +14,6 @@ import net.minestom.server.coordinate.Vec
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityType
 import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
-import net.minestom.server.event.player.PlayerDisconnectEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.event.server.ServerTickMonitorEvent
 import net.minestom.server.instance.Instance
@@ -51,7 +47,9 @@ suspend fun main(vararg args: String) {
         it.player.isAllowFlying = true
     }
 
+    var i = 0L
     MinecraftServer.getGlobalEventHandler().addListener(ServerTickMonitorEvent::class.java) {
+        if (++i % 5 != 0L) return@addListener
         val mspt = String.format("%.2f", it.tickMonitor.tickTime)
         val ram = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1_000_000.0
         for (player in MinecraftServer.getConnectionManager().onlinePlayers) {

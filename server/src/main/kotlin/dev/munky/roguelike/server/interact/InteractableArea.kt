@@ -1,10 +1,11 @@
 package dev.munky.roguelike.server.interact
 
 import dev.munky.roguelike.common.IcoSphere
+import dev.munky.roguelike.common.Initializable
 import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.interact.InteractableArea.Dsl
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.player.RoguePlayer
 import dev.munky.roguelike.server.toJoml
 import kotlinx.coroutines.*
 import net.minestom.server.MinecraftServer
@@ -62,14 +63,14 @@ data class InteractableArea(
      * has a little buffer between exiting after entry.
      */
     val thickness: Double = 2.0,
-    val onExit: (RoguelikePlayer) -> Unit = {},
-    val onEnter: (RoguelikePlayer) -> Unit = {}
+    val onExit: (RoguePlayer) -> Unit = {},
+    val onEnter: (RoguePlayer) -> Unit = {}
 ) {
     class Dsl {
         private var shape: Shape? = null
         private var thickness: Double = 1.0
-        private var onExit: (RoguelikePlayer) -> Unit = {}
-        private var onEnter: (RoguelikePlayer) -> Unit = {}
+        private var onExit: (RoguePlayer) -> Unit = {}
+        private var onEnter: (RoguePlayer) -> Unit = {}
 
         fun cuboid(from: Vector3dc, to: Vector3dc) {
             shape = Shape.cuboid(from, to)
@@ -80,10 +81,10 @@ data class InteractableArea(
         fun thickness(thickness: Double) {
             this.thickness = thickness
         }
-        fun onExit(block: (RoguelikePlayer) -> Unit) {
+        fun onExit(block: (RoguePlayer) -> Unit) {
             onExit = block
         }
-        fun onEnter(block: (RoguelikePlayer) -> Unit) {
+        fun onEnter(block: (RoguePlayer) -> Unit) {
             onEnter = block
         }
 
@@ -93,14 +94,14 @@ data class InteractableArea(
         }
     }
 
-    companion object {
+    companion object : Initializable {
         val EVENT_NODE: EventNode<PlayerEvent> = EventNode.event("${Roguelike.NAMESPACE}:interactable_area", EventFilter.PLAYER) {
-            it.player is RoguelikePlayer
+            it.player is RoguePlayer
         }
 
         fun area(block: Dsl.() -> Unit) = Dsl().apply(block).build()
 
-        fun triggerAreas(areas: Collection<InteractableArea>, player: RoguelikePlayer) {
+        fun triggerAreas(areas: Collection<InteractableArea>, player: RoguePlayer) {
             val justLeft = player.areasInside.filter {
                 !it.shape
                     .expand(it.thickness)
@@ -119,14 +120,14 @@ data class InteractableArea(
             player.areasInside.addAll(justEntered)
         }
 
-        fun initialize() {
+        override suspend fun initialize() {
             Dispatchers.Default.launch {
                 while (isActive) {
                     delay(100)
                     val instances = MinecraftServer.getInstanceManager().instances
                     coroutineScope {
                         for (instance in instances) if (instance is InteractableAreaContainer) launch {
-                            for (player in instance.players.filterIsInstance<RoguelikePlayer>()) {
+                            for (player in instance.players.filterIsInstance<RoguePlayer>()) {
                                 triggerAreas(instance.areas, player)
                             }
                         }
@@ -138,10 +139,11 @@ data class InteractableArea(
                 // spheres are memory intense
                 val sphereCache = HashMap<Shape, Pair<IcoSphere, IcoSphere>>()
                 while(isActive) {
-                    delay(100)
+                    delay(50)
                     for (instance in MinecraftServer.getInstanceManager().instances) {
                         val container = instance as? InteractableAreaContainer ?: continue
                         for (a in container.areas) {
+                            delay(50)
                             val shape = a.shape
                             val innerParticle = Particle.DUST.withColor(Color(200, 0, 0))
                             val outerParticle = Particle.DUST.withColor(Color(0, 0, 200))
@@ -206,9 +208,10 @@ data class InteractableArea(
                                     }
                                 }
                             }
-                            for (p in instance.players.filterIsInstance<RoguelikePlayer>()) {
+                            for (p in instance.players.filterIsInstance<RoguePlayer>()) {
                                 if (p.isDebug) p.sendPackets(particles as List<ParticlePacket>)
                             }
+                            particles.clear()
                         }
                     }
                 }

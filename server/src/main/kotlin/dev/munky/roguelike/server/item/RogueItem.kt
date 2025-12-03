@@ -1,7 +1,7 @@
 package dev.munky.roguelike.server.item
 
 import dev.munky.roguelike.server.Roguelike
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.PlayerHand
 import net.minestom.server.event.Event
@@ -13,19 +13,16 @@ import net.minestom.server.event.player.PlayerHandAnimationEvent
 import net.minestom.server.event.trait.ItemEvent
 import net.minestom.server.event.trait.PlayerEvent
 import net.minestom.server.item.ItemStack
-import net.minestom.server.tag.Tag
 import java.util.UUID
 import java.util.WeakHashMap
 
-sealed interface RoguelikeItem {
+sealed interface RogueItem : ItemStackSupplier {
     val uuid: UUID
 
-    fun onLeftClick(player: RoguelikePlayer)
-    fun onRightClick(player: RoguelikePlayer, target: InteractTarget)
+    fun onLeftClick(player: RoguePlayer)
+    fun onRightClick(player: RoguePlayer, target: InteractTarget)
 
     fun onEvent(e: ItemEvent) {}
-
-    fun buildItem(): ItemStack
 
     sealed interface InteractTarget {
         data class Entity(val entity: net.minestom.server.entity.Entity) : InteractTarget
@@ -33,7 +30,7 @@ sealed interface RoguelikeItem {
     }
 
     companion object {
-        val MAP = WeakHashMap<ItemStack, RoguelikeItem>()
+        val MAP = WeakHashMap<ItemStack, RogueItem>()
 
         val EVENT_NODE: EventNode<Event> = EventNode.all("${Roguelike.NAMESPACE}:item.events")
         val PLAYER_EVENT_NODE: EventNode<PlayerEvent> = EventNode.type("${Roguelike.NAMESPACE}:weapon.events.player", EventFilter.PLAYER)
@@ -42,17 +39,17 @@ sealed interface RoguelikeItem {
         fun initialize() {
             PLAYER_EVENT_NODE.addListener(PlayerHandAnimationEvent::class.java) {
                 if (it.hand != PlayerHand.MAIN) return@addListener
-                val player = it.player as? RoguelikePlayer ?: return@addListener
+                val player = it.player as? RoguePlayer ?: return@addListener
                 val roguelike = MAP[it.player.itemInMainHand] ?: return@addListener // not roguelike item
                 roguelike.onLeftClick(player)
             }
             PLAYER_EVENT_NODE.addListener(PlayerEntityInteractEvent::class.java) {
-                val player = it.player as? RoguelikePlayer ?: return@addListener
+                val player = it.player as? RoguePlayer ?: return@addListener
                 val roguelike = MAP[it.player.itemInMainHand] ?: return@addListener // not roguelike item
                 roguelike.onRightClick(player, InteractTarget.Entity(it.target))
             }
             PLAYER_EVENT_NODE.addListener(PlayerBlockInteractEvent::class.java) {
-                val player = it.player as? RoguelikePlayer ?: return@addListener
+                val player = it.player as? RoguePlayer ?: return@addListener
                 val roguelike = MAP[it.player.itemInMainHand] ?: return@addListener // not roguelike item
                 roguelike.onRightClick(player, InteractTarget.Block(it.block))
             }

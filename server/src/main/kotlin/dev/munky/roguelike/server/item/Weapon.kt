@@ -1,49 +1,71 @@
 package dev.munky.roguelike.server.item
 
-import dev.munky.roguelike.server.instance.RoguelikeInstance
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.asComponent
+import dev.munky.roguelike.server.instance.RogueInstance
+import dev.munky.roguelike.server.item.modifier.ModifierData
+import dev.munky.roguelike.server.player.RoguePlayer
 import kotlinx.serialization.Serializable
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.TextDecoration
 import net.minestom.server.component.DataComponents
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
 import net.minestom.server.item.component.UseCooldown
-import net.minestom.server.tag.Tag
 import java.util.UUID
 
-@Serializable
-data class Weapon(
-    val style: CombatStyle,
-    val modifiers: Set<Modifier>
-) {
-    enum class CombatStyle(val itemModel: String) {
-        SWORD("roguelike:weapon.sword"),
-        SPELL("roguelike:weapon.spell")
-    }
-}
-
-data class WeaponInstance(val data: Weapon) : RoguelikeItem {
+data class Weapon(val data: WeaponData) : RogueItem {
     override val uuid: UUID = UUID.randomUUID()
 
-    val modifiers = data.modifiers.map { it.create(this) }
+    val modifiers = data.modifiers.entries.associate { it.key to it.value.create() }
 
-    override fun onRightClick(player: RoguelikePlayer, target: RoguelikeItem.InteractTarget) {}
-    override fun onLeftClick(player: RoguelikePlayer) {
-        val instance = player.instance as? RoguelikeInstance ?: return
+    override fun onRightClick(player: RoguePlayer, target: RogueItem.InteractTarget) {}
+    override fun onLeftClick(player: RoguePlayer) {
+        val instance = player.instance as? RogueInstance ?: return
         val ctx = AttackContext(instance, player)
-        modifiers.sorted().forEach { mod ->
-            repeat(mod.modifier.count) {
+        modifiers.values.sorted().forEach { mod ->
+            repeat(mod.data.count) {
                 mod.attack(ctx)
             }
         }
         ctx.attack()
     }
 
-    override fun buildItem(): ItemStack {
+    override fun buildItemStack(): ItemStack {
         val base = ItemStack.builder(Material.PAPER)
-            .set(DataComponents.USE_COOLDOWN, UseCooldown(modifiers.size.toFloat() * 1.5f, "weapon.cooldown"))
+            .customName(data.style.itemName.decoration(TextDecoration.ITALIC, false))
+            .set(DataComponents.USE_COOLDOWN, UseCooldown(.1f + modifiers.size.toFloat() * 1.5f, "weapon.cooldown"))
             .itemModel(data.style.itemModel).build()
-        val final = modifiers.fold(base) { acc, modifier -> modifier.decorate(acc) }
-        RoguelikeItem.MAP[final] = this
+        val final = modifiers.values.fold(base) { acc, modifier -> modifier.decorateWeapon(acc) }
+        RogueItem.MAP[final] = this
         return final
+    }
+}
+
+@Serializable
+data class WeaponData(
+    val style: CombatStyle,
+    val modifiers: Map<String, ModifierData>
+) {
+    fun withModifier(modifier: ModifierData) : WeaponData {
+        val id = modifier.id
+        val existing = modifiers[id]
+        val modifiers = modifiers.toMutableMap()
+        if (existing != null) {
+            modifiers[id] = existing.copy(count = existing.count + 1)
+        } else {
+            modifiers[id] = modifier
+        }
+        return copy(modifiers = modifiers)
+    }
+
+    enum class CombatStyle(val itemModel: String, val itemName: Component) {
+        SWORD(
+            "minecraft:iron_sword",
+            "Sword".asComponent()
+        ),
+        SPELL(
+            "roguelike:weapon.spell",
+            "Spell".asComponent()
+        )
     }
 }

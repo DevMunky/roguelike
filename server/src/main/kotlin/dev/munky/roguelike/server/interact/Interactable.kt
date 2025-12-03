@@ -1,7 +1,8 @@
 package dev.munky.roguelike.server.interact
 
+import dev.munky.roguelike.common.Initializable
 import dev.munky.roguelike.server.Roguelike
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Player
 import net.minestom.server.entity.PlayerHand
@@ -15,12 +16,12 @@ interface Interactable {
     /**
      * Invoked for only the player's main hand.
      */
-    fun onInteract(player: RoguelikePlayer)
+    fun onInteract(player: RoguePlayer)
 
-    companion object {
+    companion object : Initializable {
         val EVENT_NODE: EventNode<PlayerEvent> = EventNode.type("${Roguelike.NAMESPACE}:interactable", EventFilter.PLAYER)
 
-        fun initialize() {
+        override suspend fun initialize() {
             EVENT_NODE.addListener(PlayerEntityInteractEvent::class.java) {
                 if (it.hand != PlayerHand.MAIN) return@addListener
                 tryInteract(it.player, it.target)
@@ -29,10 +30,12 @@ interface Interactable {
                 tryInteract(it.player, it.instance)
             }
             MinecraftServer.getGlobalEventHandler().addChild(EVENT_NODE)
+            InteractableArea.initialize()
+            HoverableInteractableCreature.initialize()
         }
 
         private fun tryInteract(player: Player, other: Any) {
-            (other as? Interactable)?.onInteract(player as? RoguelikePlayer ?: return)
+            (other as? Interactable)?.onInteract(player as? RoguePlayer ?: return)
         }
     }
 }

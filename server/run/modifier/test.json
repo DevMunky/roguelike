@@ -1,0 +1,11 @@
+{
+  "id": "modifier.test",
+  "count": 1,
+  "genre": "PRIMARILY_APPEND",
+  "description": [
+    "<red>Test",
+    "<blue>Test",
+    "<green>Test"
+  ],
+  "modifier_class": "dev.munky.roguelike.server.item.modifier.FlameBurstModifier"
+}

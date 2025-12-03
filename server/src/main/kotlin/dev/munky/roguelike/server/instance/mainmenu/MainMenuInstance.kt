@@ -1,8 +1,8 @@
 package dev.munky.roguelike.server.instance.mainmenu
 
 import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
-import dev.munky.roguelike.server.instance.RoguelikeInstance
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.instance.RogueInstance
+import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.instance.LightingChunk
 import net.minestom.server.instance.block.Block
@@ -13,7 +13,7 @@ import java.util.*
 /**
  * Per-player instance where players can select a character or create a new one, then transfer to town.
  */
-class MainMenuInstance private constructor() : RoguelikeInstance(UUID.randomUUID(), MENU_DIMENSION_KEY) {
+class MainMenuInstance private constructor() : RogueInstance(UUID.randomUUID(), MENU_DIMENSION_KEY) {
     init {
         chunkSupplier = { i, x, z ->
             LightingChunk(i, x, z)
@@ -23,7 +23,7 @@ class MainMenuInstance private constructor() : RoguelikeInstance(UUID.randomUUID
         }
     }
 
-    override fun onEnter(player: RoguelikePlayer) {
+    override fun onEnter(player: RoguePlayer) {
         RenderDispatch.with(MainMenuRenderer)
             .with(player)
             .dispatch()

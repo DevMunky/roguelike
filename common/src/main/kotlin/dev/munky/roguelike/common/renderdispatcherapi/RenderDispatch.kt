@@ -32,3 +32,7 @@ class RenderDispatch private constructor(
         fun <T: Renderer> RenderContext.with(e: T) : RenderDispatch = RenderDispatch(this).with(e)
     }
 }
+
+interface RenderHandleManager {
+    fun RenderDispatch.dispatchManaged()
+}

@@ -3,8 +3,8 @@ package dev.munky.roguelike.server.instance.dungeon
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.asComponent
-import dev.munky.roguelike.server.instance.RoguelikeInstance
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.instance.RogueInstance
+import dev.munky.roguelike.server.player.RoguePlayer
 import dev.munky.roguelike.server.player.RoguelikePlayers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -35,9 +35,9 @@ object ElevatorRenderer : Renderer {
     }
 
     override suspend fun RenderContext.render() {
-        val players = get(RoguelikePlayers) ?: listOf(require(RoguelikePlayer))
+        val players = get(RoguelikePlayers) ?: listOf(require(RoguePlayer))
         val audience = ForwardingAudience { players }
-        val instance = require(RoguelikeInstance)
+        val instance = require(RogueInstance)
 
         for (player in players) {
             player.setInstance(instance, Pos.ZERO)

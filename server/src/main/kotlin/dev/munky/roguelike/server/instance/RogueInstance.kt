@@ -1,10 +1,14 @@
 package dev.munky.roguelike.server.instance
 
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
+import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
+import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
+import dev.munky.roguelike.common.renderdispatcherapi.RenderHandleManager
+import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.interact.InteractableArea
 import dev.munky.roguelike.server.interact.InteractableAreaContainer
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
@@ -16,35 +20,45 @@ import net.minestom.server.registry.RegistryKey
 import net.minestom.server.world.DimensionType
 import java.util.*
 
-abstract class RoguelikeInstance(
+abstract class RogueInstance(
     uuid: UUID,
     dimensionType: RegistryKey<DimensionType>
-) : InstanceContainer(uuid, dimensionType), InteractableAreaContainer, RenderContext.Element {
+) : InstanceContainer(uuid, dimensionType), InteractableAreaContainer, RenderContext.Element, RenderHandleManager {
     final override val key: RenderContext.Key<*> = Companion
 
     override val areas: HashSet<InteractableArea> = HashSet()
+    val regionRenderHandles = HashMap<RoguePlayer, HashMap<Renderer, RenderHandle>>()
 
     override fun createArea(b: InteractableArea.Dsl.() -> Unit) {
         areas.add(InteractableArea.area(b))
     }
 
-    open fun onEnter(player: RoguelikePlayer) {}
-    open fun onExit(player: RoguelikePlayer) {}
+    open fun onEnter(player: RoguePlayer) {}
+    open fun onExit(player: RoguePlayer) {
+        val handles = regionRenderHandles.remove(player)
+        handles?.forEach { it.value.dispose() }
+    }
 
-    companion object : RenderContext.Key<RoguelikeInstance> {
+    override fun RenderDispatch.dispatchManaged() {
+        val player = data[RoguePlayer] as? RoguePlayer ?: error("Cannot dispatchManaged without a player.")
+        val handles = regionRenderHandles.getOrPut(player) { HashMap() }
+        handles[data[Renderer]!! as Renderer] = dispatch()
+    }
+
+    companion object : RenderContext.Key<RogueInstance> {
         val EVENT_NODE: EventNode<InstanceEvent> = EventNode.type("${Roguelike.NAMESPACE}:instance", EventFilter.INSTANCE)
 
         fun initialize() {
             EVENT_NODE.addListener(AddEntityToInstanceEvent::class.java) {
-                val p = it.entity as? RoguelikePlayer ?: return@addListener
-                val i = it.instance as? RoguelikeInstance ?: return@addListener
+                val p = it.entity as? RoguePlayer ?: return@addListener
+                val i = it.instance as? RogueInstance ?: return@addListener
                 i.scheduleNextTick {
                     i.onEnter(p)
                 }
             }
             EVENT_NODE.addListener(RemoveEntityFromInstanceEvent::class.java) {
-                val p = it.entity as? RoguelikePlayer ?: return@addListener
-                val i = it.instance as? RoguelikeInstance ?: return@addListener
+                val p = it.entity as? RoguePlayer ?: return@addListener
+                val i = it.instance as? RogueInstance ?: return@addListener
                 i.scheduleNextTick {
                     i.onExit(p)
                 }

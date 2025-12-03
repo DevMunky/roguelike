@@ -2,23 +2,18 @@ package dev.munky.roguelike.server.instance.town
 
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
-import dev.munky.roguelike.server.RenderKey
-import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.asComponent
+import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.interact.Conversation
 import dev.munky.roguelike.server.interact.NpcPlayer
-import dev.munky.roguelike.server.interact.TalkingInteractable
 import dev.munky.roguelike.server.interact.conversation
-import dev.munky.roguelike.server.player.RoguelikePlayer
+import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.coordinate.Pos
-import net.minestom.server.entity.ai.EntityAIGroupBuilder
-import net.minestom.server.entity.ai.GoalSelector
-import net.minestom.server.entity.ai.target.ClosestEntityTarget
 
 object TownRenderer : Renderer {
     override suspend fun RenderContext.render() {
-        val player = require(RoguelikePlayer)
-        val town = player.instance as? TownInstance ?: return
+        val player = require(RoguePlayer)
+        val town = require(RogueInstance)
 
         val npc = TestNpc()
 
@@ -32,6 +27,8 @@ object TownRenderer : Renderer {
     }
 
     class TestNpc : NpcPlayer("test") {
+        override val range = 5.0
+
         override val conversation: Conversation = conversation(username.asComponent()) {
             interrupt("Alright then.".asComponent())
             say("hello there".asComponent())

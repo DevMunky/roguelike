@@ -3,19 +3,14 @@ package dev.munky.roguelike.server.store
 import dev.munky.roguelike.common.logger
 import dev.munky.roguelike.common.snakeCase
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.BinaryFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialFormat
 import kotlinx.serialization.StringFormat
-import kotlinx.serialization.builtins.ListSerializer
 import net.kyori.adventure.key.Key
-import net.kyori.adventure.key.Keyed
-import java.io.Closeable
-import java.io.File
-import java.io.FileInputStream
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.div
 import kotlin.io.path.inputStream
 import kotlin.io.path.isDirectory
@@ -23,7 +18,7 @@ import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.outputStream
 import kotlin.io.path.walk
 
-sealed interface Store<T : Any> {
+sealed interface Store<T : Any> : Iterable<T> {
     operator fun get(key: Key): T?
     operator fun get(value: String): T? = get(Key.key(namespace(), value))
 
@@ -53,34 +48,35 @@ sealed interface DynamicResourceStore<T : Any> : ResourceStore<T>, DynamicStore<
     override fun id() = Key.key("dynamic_resource_store:${namespace()}")
 }
 
-open class ResourceStoreImpl<T : Any>(
-    protected val serializer: KSerializer<T>,
-    protected val format: SerialFormat,
-    override val directory: Path
+open class TransformingResourceStoreImpl<S: Any, T: Any>(
+    val serializer: KSerializer<S>,
+    val format: SerialFormat,
+    override val directory: Path,
+    private val transform: suspend (S) -> Pair<String, T>
 ) : ResourceStore<T> {
     protected val entries = ConcurrentHashMap<Key, T>()
-    protected val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(5)) + CoroutineExceptionHandler { context, throwable ->
+
+    protected val scope = CoroutineScope(
+        SupervisorJob() +
+                Dispatchers.IO.limitedParallelism(5)) +
+            CoroutineExceptionHandler { context, throwable ->
+                context.handleException(throwable)
+            }
+
+    open fun CoroutineContext.handleException(throwable: Throwable) {
         LOGGER.error("Exception caught discovering entry in '${id()}'", throwable)
     }
 
-    override fun get(key: Key): T? = entries[key]
-
     override suspend fun load() {
         val files = directory.walk().toList().filter { !it.isDirectory() }
-        entries.clear()
         if (files.isEmpty()) return
         for (file in files) scope.launch {
             try {
                 val bytes = file.inputStream().use {
                     it.readBytes()
                 }
-                val e =when (format) {
-                    is StringFormat -> format.decodeFromString(serializer, bytes.decodeToString())
-                    is BinaryFormat -> format.decodeFromByteArray(serializer, bytes)
-                    else -> error("Unsupported format: $format")
-                }
-                val key = Key.key(namespace(), file.nameWithoutExtension)
-                entries[key] = e
+                val e = decode(bytes)
+                handleDecodedValue(e, file.nameWithoutExtension)
             } catch (t: Throwable) {
                 LOGGER.error("Exception caught loading file '${file}' in '${id()}'.", t)
             }
@@ -88,16 +84,38 @@ open class ResourceStoreImpl<T : Any>(
         LOGGER.info("Finished load for '${id()}'")
     }
 
+    override fun get(key: Key): T? = entries[key]
+
+    open fun decode(bytes: ByteArray) : S = when (val f = format) {
+        is StringFormat -> f.decodeFromString(serializer, bytes.decodeToString())
+        is BinaryFormat -> f.decodeFromByteArray(serializer, bytes)
+        else -> error("Unsupported format: $format")
+    }
+
+    open suspend fun handleDecodedValue(data: S, fileName: String) {
+        entries += transform(data).let { (k, v) -> Key.key(namespace(), k) to v }
+    }
+
+    override fun iterator(): Iterator<T> = entries.values.iterator()
+
     companion object {
         val LOGGER = logger {}
     }
 }
 
+open class ResourceStoreImpl<T : Any>(
+    serializer: KSerializer<T>,
+    format: SerialFormat,
+    override val directory: Path,
+    key: (T) -> String
+) : TransformingResourceStoreImpl<T, T>(serializer, format, directory, { key(it) to it })
+
 open class DynamicResourceStoreImpl<T : Any>(
     serializer: KSerializer<T>,
     format: SerialFormat,
-    directory: Path
-) : ResourceStoreImpl<T>(serializer, format, directory), DynamicResourceStore<T> {
+    directory: Path,
+    key: (T) -> String
+) : ResourceStoreImpl<T>(serializer, format, directory, key), DynamicResourceStore<T> {
     override fun set(key: Key, value: T): T? = entries.put(key, value)
 
     override suspend fun save() {
