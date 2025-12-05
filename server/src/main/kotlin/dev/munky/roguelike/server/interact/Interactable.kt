@@ -30,7 +30,7 @@ interface Interactable {
                 tryInteract(it.player, it.instance)
             }
             MinecraftServer.getGlobalEventHandler().addChild(EVENT_NODE)
-            InteractableArea.initialize()
+            InteractableRegion.initialize()
             HoverableInteractableCreature.initialize()
         }
 

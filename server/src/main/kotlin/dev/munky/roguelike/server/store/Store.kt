@@ -10,8 +10,11 @@ import kotlinx.serialization.StringFormat
 import net.kyori.adventure.key.Key
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import kotlin.coroutines.CoroutineContext
+import kotlin.io.path.PathWalkOption
 import kotlin.io.path.div
+import kotlin.io.path.fileStore
 import kotlin.io.path.inputStream
 import kotlin.io.path.isDirectory
 import kotlin.io.path.nameWithoutExtension
@@ -52,7 +55,7 @@ open class TransformingResourceStoreImpl<S: Any, T: Any>(
     val serializer: KSerializer<S>,
     val format: SerialFormat,
     override val directory: Path,
-    private val transform: suspend (S) -> Pair<String, T>
+    private val transform: suspend S.(fileName: String) -> Pair<String, T>
 ) : ResourceStore<T> {
     protected val entries = ConcurrentHashMap<Key, T>()
 
@@ -64,21 +67,19 @@ open class TransformingResourceStoreImpl<S: Any, T: Any>(
             }
 
     open fun CoroutineContext.handleException(throwable: Throwable) {
-        LOGGER.error("Exception caught discovering entry in '${id()}'", throwable)
+        LOGGER.error("Exception caught ${get(CoroutineName)} in '${id()}'", throwable)
     }
 
     override suspend fun load() {
-        val files = directory.walk().toList().filter { !it.isDirectory() }
+        val files = directory.toFile().listFiles { !it.isDirectory() }?.toList() ?: emptyList()
         if (files.isEmpty()) return
-        for (file in files) scope.launch {
-            try {
+        coroutineScope {
+            for (file in files) (scope + currentCoroutineContext() + CoroutineName("decoding file '${file.path}'")).launch {
                 val bytes = file.inputStream().use {
                     it.readBytes()
                 }
                 val e = decode(bytes)
                 handleDecodedValue(e, file.nameWithoutExtension)
-            } catch (t: Throwable) {
-                LOGGER.error("Exception caught loading file '${file}' in '${id()}'.", t)
             }
         }
         LOGGER.info("Finished load for '${id()}'")
@@ -93,7 +94,9 @@ open class TransformingResourceStoreImpl<S: Any, T: Any>(
     }
 
     open suspend fun handleDecodedValue(data: S, fileName: String) {
-        entries += transform(data).let { (k, v) -> Key.key(namespace(), k) to v }
+        val entry = transform(data, fileName).let { (k, v) -> Key.key(namespace(), k) to v }
+        entries += entry
+        LOGGER.info("Loaded '${entry.first}' from '${fileName}'.")
     }
 
     override fun iterator(): Iterator<T> = entries.values.iterator()
@@ -107,14 +110,14 @@ open class ResourceStoreImpl<T : Any>(
     serializer: KSerializer<T>,
     format: SerialFormat,
     override val directory: Path,
-    key: (T) -> String
-) : TransformingResourceStoreImpl<T, T>(serializer, format, directory, { key(it) to it })
+    key: T.(fileName: String) -> String
+) : TransformingResourceStoreImpl<T, T>(serializer, format, directory, { key(this, it) to this })
 
 open class DynamicResourceStoreImpl<T : Any>(
     serializer: KSerializer<T>,
     format: SerialFormat,
     directory: Path,
-    key: (T) -> String
+    key: T.(fileName: String) -> String
 ) : ResourceStoreImpl<T>(serializer, format, directory, key), DynamicResourceStore<T> {
     override fun set(key: Key, value: T): T? = entries.put(key, value)
 

@@ -37,7 +37,7 @@ fun testDungeon() = command("testdungeon") {
             t.printStackTrace()
         }
         ctx.launch {
-            val roomset = Roguelike.server().roomSets()["example"]!!
+            val roomset = Roguelike.server().roomSets()["test"]!!
             val dungeon = Dungeon.create(roomset)
             s.setInstance(dungeon, Pos(.0, 40.0, .0))
         }

@@ -4,11 +4,14 @@ dependencies {
     }
     implementation(project(":common"))
 
+    implementation(files("../schem/build/libs/schem-dev.jar"))
+
     implementation(libs.minestom)
-    implementation(libs.joml)
-    implementation(libs.bundles.logback)
     implementation(libs.adventure.minimessage)
+    implementation(libs.joml)
     implementation(libs.bundles.polyglot)
+
+    implementation(libs.bundles.logback)
 }
 
 tasks {

@@ -17,12 +17,22 @@ import dev.munky.roguelike.server.player.RoguePlayer
 import dev.munky.roguelike.server.store.DynamicResourceStore
 import dev.munky.roguelike.server.store.DynamicResourceStoreImpl
 import dev.munky.roguelike.server.store.ResourceStore
+import dev.munky.roguelike.server.store.ResourceStoreImpl
 import dev.munky.roguelike.server.store.TransformingResourceStoreImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.BinaryFormat
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNamingStrategy
+import kotlinx.serialization.modules.EmptySerializersModule
+import kotlinx.serialization.modules.SerializersModule
+import net.benwoodworth.knbt.Nbt
+import net.benwoodworth.knbt.NbtCompression
+import net.benwoodworth.knbt.NbtVariant
+import net.hollowcube.schem.Structure
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.ServerProcess
@@ -49,7 +59,7 @@ class Roguelike private constructor() {
             encodeDefaults = true
         },
         Path("account/"),
-        key = { it.uuid.toString() }
+        key = { uuid.toString() }
     )
     fun accounts() : DynamicResourceStore<AccountData> = accountStore
 
@@ -60,7 +70,7 @@ class Roguelike private constructor() {
             namingStrategy = JsonNamingStrategy.SnakeCase
         },
         Path("modifier/"),
-        key = { it.id }
+        key = { id }
     )
 
     /**
@@ -75,9 +85,21 @@ class Roguelike private constructor() {
             namingStrategy = JsonNamingStrategy.SnakeCase
         },
         Path("roomset/"),
-        transform = { it.id to RoomSet.create(it) }
+        transform = { id to RoomSet.create(this) }
     )
     fun roomSets() : ResourceStore<RoomSet> = roomSetStore
+
+    private val structureStore = ResourceStoreImpl(
+        StructureSerializer,
+        Nbt {
+            variant = NbtVariant.Java
+            nameRootClasses = false
+            compression = NbtCompression.Gzip
+        },
+        directory = Path("structure/"),
+        key = { it }
+    )
+    fun structures() : ResourceStore<Structure> = structureStore
 
     fun renderDistance(r: Int) {
         requireNotTooLate()
@@ -118,8 +140,9 @@ class Roguelike private constructor() {
         RogueInstance.initialize()
         withContext(Dispatchers.IO) {
             accounts().load()
-            roomSets().load()
             modifiers().load()
+            structures().load()
+            roomSets().load()
         }
     }
 
@@ -129,6 +152,7 @@ class Roguelike private constructor() {
         MinecraftServer.getDimensionTypeRegistry().register("${NAMESPACE}:main_menu", MENU_DIMENSION)
 
         registerCommands()
+        registerBlockHandlers()
     }
 
     fun start(host: String, port: Int) {
@@ -157,6 +181,6 @@ class Roguelike private constructor() {
         fun server() = INSTANCE
         fun build(f: Roguelike.()->Unit) : Roguelike =
             if (::INSTANCE.isInitialized) error("There is already an instance of Roguelike.")
-            else Roguelike().also(f).also(Roguelike::register)
+            else Roguelike().also(Roguelike::register).also(f)
     }
 }

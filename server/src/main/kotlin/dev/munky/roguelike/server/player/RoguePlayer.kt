@@ -3,7 +3,8 @@ package dev.munky.roguelike.server.player
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.interact.HoverableInteractableCreature
-import dev.munky.roguelike.server.interact.InteractableArea
+import dev.munky.roguelike.server.interact.InteractableRegion
+import dev.munky.roguelike.server.interact.Region
 import dev.munky.roguelike.server.item.WeaponData
 import dev.munky.roguelike.server.item.Weapon
 import kotlinx.serialization.Serializable
@@ -23,7 +24,11 @@ class RoguePlayer(connection: PlayerConnection, profile: GameProfile) : Player(c
     var isDebug = true
 
     var hoveredInteractable: HoverableInteractableCreature? = null
-    val areasInside = HashSet<InteractableArea>()
+
+    /**
+     * The area and the expanded shape for detecting exit.
+     */
+    val areasInside = HashMap<InteractableRegion, Region>()
 
     val account = Roguelike.server().accounts()[uuid.toString()] ?: AccountData.new(this)
     var character = Character(account.characters.first())

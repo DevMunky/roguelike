@@ -6,7 +6,7 @@ import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
 import dev.munky.roguelike.common.renderdispatcherapi.RenderHandleManager
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.Roguelike
-import dev.munky.roguelike.server.interact.InteractableArea
+import dev.munky.roguelike.server.interact.InteractableRegion
 import dev.munky.roguelike.server.interact.InteractableAreaContainer
 import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.MinecraftServer
@@ -26,11 +26,11 @@ abstract class RogueInstance(
 ) : InstanceContainer(uuid, dimensionType), InteractableAreaContainer, RenderContext.Element, RenderHandleManager {
     final override val key: RenderContext.Key<*> = Companion
 
-    override val areas: HashSet<InteractableArea> = HashSet()
+    override val areas: HashSet<InteractableRegion> = HashSet()
     val regionRenderHandles = HashMap<RoguePlayer, HashMap<Renderer, RenderHandle>>()
 
-    override fun createArea(b: InteractableArea.Dsl.() -> Unit) {
-        areas.add(InteractableArea.area(b))
+    override fun createArea(b: InteractableRegion.Dsl.() -> Unit) {
+        areas.add(InteractableRegion.Dsl().apply(b).build())
     }
 
     open fun onEnter(player: RoguePlayer) {}
