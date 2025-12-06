@@ -24,6 +24,8 @@ interface Region {
      */
     val boundingBox: Cuboid
 
+    fun offset(p: Vector3dc): Region
+
     fun expand(amount: Double): Region
     fun contains(p: Vector3dc): Boolean
 
@@ -47,6 +49,8 @@ interface Region {
             val off = p.sub(center, Vector3d())
             return off.lengthSquared() <= radius * radius
         }
+
+        override fun offset(p: Vector3dc): Region = Sphere(center.add(p, Vector3d()), radius)
 
         override val boundingBox: Cuboid by lazy {
             val r = radius
@@ -93,6 +97,8 @@ interface Region {
     }
 
     data class Cuboid(val min: Vector3dc, val max: Vector3dc) : Region {
+        override val boundingBox: Cuboid = this
+
         override fun expand(amount: Double): Region = copy(
             min = min.sub(Vector3d(amount), Vector3d()),
             max = max.add(Vector3d(amount), Vector3d())
@@ -105,7 +111,7 @@ interface Region {
             return true
         }
 
-        override val boundingBox: Cuboid = this
+        override fun offset(p: Vector3dc): Region = Cuboid(min.add(p, Vector3d()), max.add(p, Vector3d()))
 
         override fun intersects(other: Region): Boolean = when (other) {
             is Cuboid -> {
@@ -174,24 +180,22 @@ interface InteractableRegion {
             EventNode.event("${Roguelike.NAMESPACE}:interactable_area", EventFilter.PLAYER) { it.player is RoguePlayer }
 
         fun triggerAreas(areas: Collection<InteractableRegion>, player: RoguePlayer) {
-            synchronized(player.areasInside) {
-                val justLeft = player.areasInside.mapNotNull {
-                    if (!it.value.contains(player.position.toJoml())) it.key else null
-                }
+            val justLeft = player.areasInside.mapNotNull {
+                if (!it.value.contains(player.position.toJoml())) it.key else null
+            }
 
-                val justEntered = areas.filter {
-                    it !in player.areasInside && it.region.contains(player.position.toJoml())
-                }
+            val justEntered = areas.filter {
+                !player.areasInside.containsKey(it) && it.region.contains(player.position.toJoml())
+            }
 
-                for (area in justLeft) {
-                    area.onExit(player)
-                    player.areasInside.remove(area)
-                }
+            for (area in justLeft) {
+                area.onExit(player)
+                player.areasInside.remove(area)
+            }
 
-                for (area in justEntered) {
-                    area.onEnter(player)
-                    player.areasInside[area] = area.region.expand(area.thickness)
-                }
+            for (area in justEntered) {
+                area.onEnter(player)
+                player.areasInside[area] = area.region.expand(area.thickness)
             }
         }
 
@@ -202,8 +206,10 @@ interface InteractableRegion {
                     val instances = MinecraftServer.getInstanceManager().instances
                     coroutineScope {
                         for (instance in instances) if (instance is InteractableAreaContainer) launch {
-                            for (player in instance.players.filterIsInstance<RoguePlayer>()) {
-                                triggerAreas(instance.areas, player)
+                            synchronized(instance.players) {
+                                for (player in instance.players.filterIsInstance<RoguePlayer>()) {
+                                    triggerAreas(instance.areas, player)
+                                }
                             }
                         }
                     }
@@ -217,7 +223,10 @@ interface InteractableRegion {
                     delay(50)
                     for (instance in MinecraftServer.getInstanceManager().instances) {
                         val container = instance as? InteractableAreaContainer ?: continue
-                        for (a in container.areas) {
+                        val areas = synchronized(container.areas) {
+                            container.areas.toList()
+                        }
+                        for (a in areas) {
                             delay(50)
                             val shape = a.region
                             val innerParticle = Particle.DUST.withColor(Color(200, 0, 0))

@@ -26,12 +26,7 @@ class LogbackLevelString : CompositeConverter<ILoggingEvent>() {
             Level.TRACE -> " T "
             else -> " ? "
         }
-        val sb = StringBuilder(ANSIConstants.ESC_START)
-        sb.append(getAnsi(event))
-        sb.append(ANSIConstants.ESC_END)
-        sb.append(str)
-        sb.append(SET_DEFAULT_COLOR)
-        return sb.toString()
+        return ANSIConstants.ESC_START + getAnsi(event) + ANSIConstants.ESC_END + str + SET_DEFAULT_COLOR
     }
 
     fun getAnsi(event: ILoggingEvent) : String = when (event.level) {

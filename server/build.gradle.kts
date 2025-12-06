@@ -6,7 +6,9 @@ dependencies {
 
     implementation(files("../schem/build/libs/schem-dev.jar"))
 
-    implementation(libs.minestom)
+    implementation(libs.minestom) {
+        isTransitive = true
+    }
     implementation(libs.adventure.minimessage)
     implementation(libs.joml)
     implementation(libs.bundles.polyglot)

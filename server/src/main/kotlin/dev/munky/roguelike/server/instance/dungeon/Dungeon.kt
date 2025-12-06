@@ -1,6 +1,7 @@
 package dev.munky.roguelike.server.instance.dungeon
 
 import dev.munky.roguelike.common.logger
+import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.roomset.JigsawConnection
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomBlueprint
@@ -9,19 +10,22 @@ import dev.munky.roguelike.server.instance.town.TownInstance.Companion.TOWN_DIME
 import dev.munky.roguelike.server.interact.InteractableRegion
 import dev.munky.roguelike.server.interact.Region
 import dev.munky.roguelike.server.player.RoguePlayer
-import dev.munky.roguelike.server.toJoml
-import kotlinx.coroutines.withTimeoutOrNull
 import net.hollowcube.schem.util.Rotation
+import net.kyori.adventure.title.TitlePart
 import net.minestom.server.MinecraftServer
-import net.minestom.server.coordinate.Area
 import net.minestom.server.coordinate.BlockVec
+import net.minestom.server.coordinate.CoordConversion
 import net.minestom.server.entity.GameMode
 import net.minestom.server.instance.LightingChunk
 import java.util.*
+import kotlin.math.ceil
+import kotlin.math.floor
 
 class Dungeon private constructor(
     val roomset: RoomSet
 ) : RogueInstance(UUID.randomUUID(), TOWN_DIMENSION_KEY) {
+    var isDebug = true
+
     init {
         chunkSupplier = { i, x, z ->
             LightingChunk(i, x, z)
@@ -43,112 +47,96 @@ class Dungeon private constructor(
     override fun onExit(player: RoguePlayer) {
         player.gameMode = GameMode.SURVIVAL
         player.permissionLevel = 4
-        if (players.isEmpty()) {
-            MinecraftServer.getInstanceManager().unregisterInstance(this)
-        }
         super.onExit(player)
+        if (players.isEmpty()) {
+            shutdown()
+        }
+    }
+
+    private fun shutdown() {
+        rootRoom = null
+        areas.clear()
+        regionRenderHandles.forEach { map -> map.value.forEach { h -> h.value.dispose() } }
+        MinecraftServer.getInstanceManager().unregisterInstance(this)
     }
 
     private suspend fun initialize() {
         // place root room at origin
         try {
-            val rootData = roomset.rooms[RoomSet.ROOT_ROOM_ID] ?: error("No root room '${RoomSet.ROOT_ROOM_ID}' defined.")
-            try {
-                rootRoom = createRoom(
-                    bp = rootData,
-                    at = BlockVec.ZERO,
-                    rotation = Rotation.NONE
-                )
-                withTimeoutOrNull(10000) {
-                    generate(rootRoom!!, 3)
-                } ?: error("Took too long to generate.")
-            } catch (t: Throwable) {
-                throw RuntimeException("Failed to generate.", t)
+            val generator = BackTrackingGenerator(roomset, maxDepth = 20, seed = System.nanoTime(), debug = isDebug)
+            val plan = when (val generation = generator.plan()) {
+                Generator.Result.Failure.NO_POOL -> throw RuntimeException("No pool available..")
+                Generator.Result.Failure.EXCEEDED_DEPTH -> throw RuntimeException("Exceeded max depth.")
+                Generator.Result.Failure.NO_VALID_CONNECTION -> throw RuntimeException("No valid connection found.")
+                is Generator.Result.Success -> generation.room
+            }
+
+            rootRoom = commitPlan(plan)
+
+            for (player in players) {
+                player.sendTitlePart(TitlePart.TITLE,"<green>Dungeon generated".asComponent())
             }
         } catch (t: Throwable) {
+            for (player in players) {
+                player.sendTitlePart(TitlePart.TITLE,"<red>Dungeon generation failed".asComponent())
+                player.sendTitlePart(TitlePart.SUBTITLE,"<red>${t.message ?: "no reason"}".asComponent())
+            }
             throw RuntimeException("Exception caught initializing dungeon.", t)
-        }
-    }
-
-    private suspend fun generate(room: Room, depth: Int) {
-        if (depth <= 0) return
-        val pools = roomset.data.pools
-        val connections = room.connections.takeIf { it.isNotEmpty() } ?: run {
-            LOGGER.warn("No connections defined for room '${room.blueprint.id}'.")
-            return
-        }
-        for (connection in connections.mapNotNull { if (it.value != null) null else it.key }) {
-            val invertedDirection = connection.direction.opposite()
-            val pool = pools[connection.pool] ?: error("No pool '${connection.pool}' defined.")
-            if (pool.isEmpty()) {
-                LOGGER.warn("Pool '${connection.pool}' in Roomset '${roomset.id}' is empty.")
-                continue
-            }
-            var tries = pool.size
-            var connected = false
-            var randomRoomId = pool.random()
-            while (!connected && tries > 0) {
-                val other = roomset.rooms[randomRoomId]!! // RoomSetData checked
-
-                var rotation = Rotation.entries.first()
-                while (!connected) {
-                    val otherConnections = other.connectionsBy(rotation)
-                    for (otherConnection in otherConnections) {
-                        if (otherConnection.pool != connection.pool) continue
-                        if (otherConnection.direction != invertedDirection) continue
-                        // align positions
-
-                        // connectorPos is the world position of this room's jigsaw block
-                        val connectorPos = connection.position.add(room.position)
-                        // where the other room's jigsaw should be.
-                        val otherConnectionPos = connectorPos.add(connection.direction.normalX(), connection.direction.normalY(), connection.direction.normalZ())
-                        val otherRoomPos = otherConnectionPos.sub(otherConnection.position).asBlockVec()
-
-                        // check bounds
-                        val otherBounds = other.boundsBy(otherRoomPos, rotation)
-                        // assume the root room is already present if we are generating from it
-                        if (rootRoom!!.intersectsWithChildren(otherBounds)) {
-                            LOGGER.info("Skipping connection '${otherConnection.name}' in room '${other.id}': intersection.")
-                            continue
-                        }
-                        // Does not intersect with any existing room. Big speed opportunities here
-                        // A spatial hierarchy would help a lot, but that's a later issue
-
-                        // The room doesn't intersect with anything, let's create it.
-                        val newRoom = createRoom(other, otherConnections.associateWith { null }.toMutableMap(), otherRoomPos, rotation)
-                        newRoom.connections[otherConnection] = room
-                        room.connections[connection] = newRoom
-                        try {
-                            generate(newRoom, depth - 1) // depth first, whatever.
-                        } catch (t: Throwable) {
-                            throw RuntimeException("Failed to generate room '${newRoom.blueprint.id}'.", t)
-                        }
-                        connected = true
-                        break
-                    }
-                    if (rotation == Rotation.entries.last()) break
-                    rotation = Rotation.entries[rotation.ordinal + 1]
-                }
-                if (!connected) {
-                    tries -= 1
-                    randomRoomId = pool.random()
-                }
-            }
-            if (!connected) error("Connection '${connection.name}' for pool '${connection.pool}' in room '${room.blueprint.id}' found no valid connections.")
         }
     }
 
     private suspend fun createRoom(
         bp: RoomBlueprint,
-        connections: MutableMap<JigsawConnection, Room?> = bp.connectionsBy(Rotation.CLOCKWISE_90).associateWith { null }.toMutableMap(),
+        connections: MutableMap<JigsawConnection, Room?>,
         at: BlockVec,
         rotation: Rotation
-    ) : Room {
-        val area = bp.paste(this@Dungeon, at, rotation)
-        return Room(bp, connections, at, area).also { areas += it }
+    ): Room {
+        val region = bp.paste(this@Dungeon, at, rotation)
+        val room = Room(bp, connections, at, region).also { areas += it }
+        return room
     }
 
-    @Suppress("UnstableApiUsage")
+    private suspend fun commitPlan(root: PlannedRoom): Room {
+        // 1st pass: paste rooms
+        val plannedToReal = IdentityHashMap<PlannedRoom, Room>()
+        val stack = ArrayDeque<PlannedRoom>()
+        stack.add(root)
+        while (stack.isNotEmpty()) {
+            val pr = stack.removeLast()
+            if (plannedToReal.containsKey(pr)) continue
+
+            val connections = HashMap<JigsawConnection, Room?>(pr.connections.size)
+            pr.blueprint.connectionsBy(pr.rotation).associateWithTo(connections) { null as Room? }
+
+            val room = createRoom(pr.blueprint, connections, pr.position, pr.rotation)
+            plannedToReal[pr] = room
+
+            // enqueue children
+            for (child in pr.connections.values) {
+                if (child != null) stack.add(child)
+            }
+        }
+
+        // 2nd pass: wire connections in both directions
+        for ((pr, real) in plannedToReal.entries) {
+            for ((c, child) in pr.connections) {
+                if (child != null) {
+                    val childReal = plannedToReal[child] ?: continue
+                    // Defensive: avoid self-referential connection which can cause recursion/stack overflows
+                    if (childReal === real) continue
+                    real.connections[c] = childReal
+                    // find reverse key in child
+                    val reverseKey = child.connections.entries.firstOrNull { it.value === pr }?.key
+                    if (reverseKey != null) {
+                        childReal.connections[reverseKey] = real
+                    }
+                }
+            }
+        }
+
+        return plannedToReal[root]!!
+    }
+
     class Room(
         val blueprint: RoomBlueprint,
         /**
@@ -156,20 +144,9 @@ class Dungeon private constructor(
          */
         val connections: MutableMap<JigsawConnection, Room?>,
         val position: BlockVec,
-        val area: Area
+        override val region: Region
     ) : InteractableRegion {
-
-        override val region: Region = Region.Cuboid(area.bound().min().toJoml(), area.bound().max().toJoml())
         override val thickness: Double = 0.666
-
-        fun intersectsWith(other: Area) = area.intersect(other).isEmpty()
-        fun intersectsWithChildren(other: Area) : Boolean {
-            if (intersectsWith(other)) return true
-            for (child in connections.values) {
-                if (child?.intersectsWithChildren(other) ?: false) return true
-            }
-            return false
-        }
 
         override fun onEnter(player: RoguePlayer) {
             player.sendMessage("Entered room ${blueprint.id}")
@@ -183,9 +160,13 @@ class Dungeon private constructor(
     companion object {
         val LOGGER = logger {}
 
-        suspend fun create(roomset: RoomSet) : Dungeon = Dungeon(roomset).apply {
-            runCatching { initialize() }.onFailure { LOGGER.error("Failed to initialize dungeon.", it) }
+        suspend fun create(roomset: RoomSet, players: List<RoguePlayer>): Dungeon = Dungeon(roomset).apply {
+            initialize()
             MinecraftServer.getInstanceManager().registerInstance(this)
+            if (players.all { it.isDebug }) isDebug = true
+            for (player in players) {
+                player.setInstance(this, BlockVec.ZERO)
+            }
         }
     }
 }

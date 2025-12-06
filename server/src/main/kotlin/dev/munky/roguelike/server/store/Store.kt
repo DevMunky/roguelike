@@ -71,7 +71,7 @@ open class TransformingResourceStoreImpl<S: Any, T: Any>(
     }
 
     override suspend fun load() {
-        val files = directory.toFile().listFiles { !it.isDirectory() }?.toList() ?: emptyList()
+        val files = directory.toFile().walk().filter { !it.isDirectory() }.toList()
         if (files.isEmpty()) return
         coroutineScope {
             for (file in files) (scope + currentCoroutineContext() + CoroutineName("decoding file '${file.path}'")).launch {
@@ -79,7 +79,13 @@ open class TransformingResourceStoreImpl<S: Any, T: Any>(
                     it.readBytes()
                 }
                 val e = decode(bytes)
-                handleDecodedValue(e, file.nameWithoutExtension)
+                handleDecodedValue(
+                    e,
+                    file.path
+                        .replace("\\", "/")
+                        .removePrefix(namespace() + "/")
+                        .takeWhile { it != '.' }
+                )
             }
         }
         LOGGER.info("Finished load for '${id()}'")
@@ -93,10 +99,10 @@ open class TransformingResourceStoreImpl<S: Any, T: Any>(
         else -> error("Unsupported format: $format")
     }
 
-    open suspend fun handleDecodedValue(data: S, fileName: String) {
-        val entry = transform(data, fileName).let { (k, v) -> Key.key(namespace(), k) to v }
+    open suspend fun handleDecodedValue(data: S, path: String) {
+        val entry = transform(data, path).let { (k, v) -> Key.key(namespace(), k) to v }
         entries += entry
-        LOGGER.info("Loaded '${entry.first}' from '${fileName}'.")
+        LOGGER.info("Loaded '${entry.first}' from '${path}'.")
     }
 
     override fun iterator(): Iterator<T> = entries.values.iterator()

@@ -2,12 +2,14 @@
   "id": "test",
   "dimension_key": "minecraft:overworld",
   "pools": {
-    "roguelike:root": [
-      "other"
-    ]
+    "roguelike:root": {
+      "test/room": 1, "test/end_cap": 1, "test/terrain": 1, "test/root": 1
+    }
   },
   "rooms": {
-    "other": {},
-    "root": {}
+    "test/end_cap": {},
+    "test/room": {},
+    "test/terrain": {},
+    "test/root": {}
   }
 }

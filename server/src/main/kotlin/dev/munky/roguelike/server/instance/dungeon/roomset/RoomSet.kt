@@ -1,9 +1,12 @@
 package dev.munky.roguelike.server.instance.dungeon.roomset
 
+import dev.munky.roguelike.common.WeightedRandomList
 import dev.munky.roguelike.common.logger
 import dev.munky.roguelike.server.Roguelike
+import dev.munky.roguelike.server.interact.Region
 import dev.munky.roguelike.server.loadChunksInGlobal
 import dev.munky.roguelike.server.rotate
+import dev.munky.roguelike.server.toJoml
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import net.hollowcube.schem.BlockEntityData
@@ -19,9 +22,14 @@ import net.minestom.server.instance.Chunk
 import net.minestom.server.instance.Instance
 import net.minestom.server.instance.block.Block
 import net.minestom.server.utils.Direction
+import java.util.EnumMap
 
 class RoomSet private constructor(val data: RoomSetData) {
     val id = data.id
+
+    val pools = data.pools.mapValues { (_, v) -> WeightedRandomList(v) }
+
+    val rootRoomId = "$id/$ROOT_ROOM_ID"
 
     var rooms: Map<String, RoomBlueprint> = emptyMap()
         private set
@@ -56,7 +64,8 @@ data class RoomBlueprint(
     val data: RoomData
 ) {
     private var structure: Structure = Structure(Vec.ZERO, emptyList(), emptyList(), emptyList())
-    private val cachedConnections = HashMap<Rotation, List<JigsawConnection>>()
+    private val connectionCache = EnumMap<Rotation, List<JigsawConnection>>(Rotation::class.java)
+    private val regionCache = EnumMap<Rotation, Region.Cuboid>(Rotation::class.java)
 
     suspend fun initialize() {
         try {
@@ -69,7 +78,7 @@ data class RoomBlueprint(
     }
 
     fun connectionsBy(rotation: Rotation) : List<JigsawConnection> {
-        cachedConnections[rotation]?.let {
+        connectionCache[rotation]?.let {
             return it
         }
 
@@ -115,11 +124,22 @@ data class RoomBlueprint(
         }
 
         // Cache to avoid recomputing
-        cachedConnections[rotation] = result
+        connectionCache[rotation] = result
         return result
     }
 
-    fun boundsBy(at: Point, rotation: Rotation) : Area.Cuboid {
+    fun regionBy(at: Point, rotation: Rotation) : Region.Cuboid {
+        val r = regionCache.getOrPut(rotation) { computeRegion(rotation) }
+        return r.offset(at.toJoml()) as Region.Cuboid
+    }
+
+    private fun computeRegion(rotation: Rotation) : Region.Cuboid {
+        val min = centerToMin(Vec.ZERO, rotation)
+        val max = min.add(rotatedSize(rotation)).asBlockVec()
+        return Region.Cuboid(min.toJoml(), max.toJoml())
+    }
+
+    fun areaBy(at: Point, rotation: Rotation) : Area.Cuboid {
         // 'at' is expected to be the center of the structure (XYZ). Compute min corner from center.
         val minCorner = centerToMin(at, rotation)
         val max = minCorner.add(rotatedSize(rotation)).asBlockVec()
@@ -129,15 +149,15 @@ data class RoomBlueprint(
     /**
      * Returns the area of this room post-rotation.
      */
-    suspend fun paste(instance: Instance, at: Point, rotation: Rotation = Rotation.NONE) : Area.Cuboid {
-        val area = boundsBy(at, rotation)
+    suspend fun paste(instance: Instance, at: Point, rotation: Rotation = Rotation.NONE) : Region.Cuboid {
+        val area = areaBy(at, rotation)
         val min = area.min()
         val max = area.max()
 
         instance.loadChunksInGlobal(min.blockX to max.blockX, min.blockZ to max.blockZ)
 
         setBlocksUnsafe(instance, min, rotation)
-        return Area.cuboid(min, max)
+        return Region.Cuboid(min.toJoml(), max.toJoml())
     }
 
     /**
@@ -145,6 +165,7 @@ data class RoomBlueprint(
      */
     private suspend fun setBlocksUnsafe(instance: Instance, at: BlockVec, rotation: Rotation) {
         val blockMgr = MinecraftServer.getBlockManager()
+        val changedChunks = HashSet<Chunk>()
         withContext(Dispatchers.IO) {
             var chunk: Chunk
             val palette = structure.palettes.first()
@@ -165,6 +186,11 @@ data class RoomBlueprint(
                     @Suppress("UnstableApiUsage")
                     block = block.withHandler(blockMgr.getHandlerOrDummy(lowerKey))
                         .withNbt(blockEntity.data)
+
+                    if (block.compare(Block.JIGSAW, Block.Comparator.ID)) {
+                        val final = block.nbtOrEmpty().getString("final_state")
+                        block = Block.fromState(final) ?: error("Invalid final state $final for jigsaw block ${bi.pos}.")
+                    }
                 }
                 // rotated local position, then translate by min
                 val localRot = rotateAboutCenter(bi.pos, rotation)
@@ -177,8 +203,10 @@ data class RoomBlueprint(
                 synchronized(chunk) {
                     chunk.setBlock(pos, block)
                 }
+                changedChunks.add(chunk)
             }
         }
+        changedChunks.forEach(Chunk::sendChunk)
     }
 
     /**
@@ -234,6 +262,26 @@ data class RoomBlueprint(
             else -> if (orientation.startsWith("up")) Direction.UP else Direction.DOWN
         }
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as RoomBlueprint
+
+        if (id != other.id) return false
+        if (parent != other.parent) return false
+        if (data != other.data) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = id.hashCode()
+        result = 31 * result + parent.hashCode()
+        result = 31 * result + data.hashCode()
+        return result
+    }
 }
 
 data class JigsawConnection(
@@ -254,11 +302,11 @@ data class RoomSetData(
     /**
      * A map of pool names to groupings of rooms.
      */
-    val pools: Map<String, List<String>>
+    val pools: Map<String, Map<String, Double>>
 ) {
     init {
-        for ((id, pool) in pools) {
-            for (room in pool) if (!rooms.containsKey(room)) {
+        for ((id, element) in pools) {
+            for (room in element.keys) if (!rooms.containsKey(room)) {
                 LOGGER.warn("Pool '$id' of Roomset '${this.id}' references room '$room' which does not exist.")
             }
         }

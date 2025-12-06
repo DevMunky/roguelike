@@ -1,0 +1,31 @@
+{
+  "id": "layout",
+  "dimension_key": "minecraft:overworld",
+  "pools": {
+    "roguelike:hallways": {
+      "layout/hallway/door": 1,
+      "layout/hallway/junction": 0.1,
+      "layout/hallway/left": 0.5,
+      "layout/hallway/right": 0.5,
+      "layout/hallway/straight": 1
+    },
+    "roguelike:rooms": {
+      "layout/rooms/big": 1,
+      "layout/rooms/small_loot": 1,
+      "layout/rooms/drop": 1
+    }
+  },
+  "rooms": {
+    "layout/root": {},
+
+    "layout/hallway/door": {},
+    "layout/hallway/junction": {},
+    "layout/hallway/left": {},
+    "layout/hallway/right": {},
+    "layout/hallway/straight": {},
+
+    "layout/rooms/big": {},
+    "layout/rooms/small_loot": {},
+    "layout/rooms/drop": {}
+  }
+}

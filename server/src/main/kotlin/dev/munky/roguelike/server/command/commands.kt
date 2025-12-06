@@ -4,8 +4,11 @@ import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.instance.dungeon.Dungeon
+import dev.munky.roguelike.server.player.RoguePlayer
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import net.minestom.server.command.builder.arguments.Argument
+import net.minestom.server.command.builder.arguments.ArgumentType
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.EntityCreature
 import net.minestom.server.entity.EntityType
@@ -30,16 +33,18 @@ fun spawnRandoms() = command("spawnrandoms") {
 }
 
 fun testDungeon() = command("testdungeon") {
-    playerExecutor{ s, _ ->
-        s.sendMessage("testing dungeon")
-        val ctx = Dispatchers.Default + CoroutineExceptionHandler { _, t ->
-            s.sendMessage("<red>Exception caught: $t".asComponent())
-            t.printStackTrace()
-        }
-        ctx.launch {
-            val roomset = Roguelike.server().roomSets()["test"]!!
-            val dungeon = Dungeon.create(roomset)
-            s.setInstance(dungeon, Pos(.0, 40.0, .0))
+    add(ArgumentType.String("roomset_id")) {
+        playerExecutor{ s, c ->
+            s.sendMessage("testing dungeon")
+            val roomsetId = c.get<String>("roomset_id")
+            val ctx = Dispatchers.Default + CoroutineExceptionHandler { _, t ->
+                s.sendMessage("<red>Exception caught: $t".asComponent())
+                t.printStackTrace()
+            }
+            val roomset = Roguelike.server().roomSets()[roomsetId]!!
+            ctx.launch {
+                val dungeon = Dungeon.create(roomset, listOf(s as RoguePlayer))
+            }
         }
     }
 }

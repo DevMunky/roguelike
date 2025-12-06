@@ -35,6 +35,7 @@ abstract class RogueInstance(
 
     open fun onEnter(player: RoguePlayer) {}
     open fun onExit(player: RoguePlayer) {
+        player.areasInside.clear()
         val handles = regionRenderHandles.remove(player)
         handles?.forEach { it.value.dispose() }
     }

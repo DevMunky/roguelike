@@ -14,6 +14,7 @@ import net.minestom.server.entity.attribute.AttributeModifier
 import net.minestom.server.entity.attribute.AttributeOperation
 import net.minestom.server.network.player.GameProfile
 import net.minestom.server.network.player.PlayerConnection
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A player in the roguelike server.
@@ -28,7 +29,7 @@ class RoguePlayer(connection: PlayerConnection, profile: GameProfile) : Player(c
     /**
      * The area and the expanded shape for detecting exit.
      */
-    val areasInside = HashMap<InteractableRegion, Region>()
+    val areasInside = ConcurrentHashMap<InteractableRegion, Region>()
 
     val account = Roguelike.server().accounts()[uuid.toString()] ?: AccountData.new(this)
     var character = Character(account.characters.first())

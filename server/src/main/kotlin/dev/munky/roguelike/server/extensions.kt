@@ -25,7 +25,6 @@ suspend fun Instance.loadChunksInChunks(rx: Pair<Int, Int>, rz: Pair<Int, Int>) 
     val z1 = max(rz.first, rz.second)
     val x2 = min(rx.first, rx.second)
     val z2 = min(rz.first, rz.second)
-    println("loading chunks from $x1 $z1 to $x2 $z2")
     for (x in x2..x1) {
         for (z in z2..z1) {
             launch { loadChunk(x, z).await() }
