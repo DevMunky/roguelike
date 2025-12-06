@@ -24,7 +24,7 @@ interface Generator {
     sealed interface Result {
         data class Success(val room: PlannedRoom) : Result
         enum class Failure : Result {
-            EXCEEDED_DEPTH,
+            DEPTH_EXCEEDED,
             NO_VALID_CONNECTION,
             NO_POOL,
         }
@@ -100,7 +100,7 @@ class BackTrackingGenerator(
         // We must satisfy ALL open connections of this room (and their descendants)
         if (depth < 0) {
             logDebug { "generate(): exceeded depth; room='${room.blueprint.id}' pos=${room.position}" }
-            return Generator.Result.Failure.EXCEEDED_DEPTH
+            return Generator.Result.Failure.DEPTH_EXCEEDED
         }
 
         val open = room.connections.keys.filter { room.connections[it] == null }
@@ -148,10 +148,10 @@ class BackTrackingGenerator(
             index(candidateData.chunks, candidate)
 
             logDebug { "satisfyConnection(): descending into ${candidate.blueprint.id}." }
-            val branchResult = if (generate(candidate, depth - 1) is Generator.Result.Success) {
-                generate(room, depth)
-            } else {
-                Generator.Result.Failure.NO_VALID_CONNECTION
+
+            val branchResult = when (val r = generate(candidate, depth - 1)) {
+                is Generator.Result.Success -> generate(room, depth)
+                else -> r
             }
 
             if (branchResult is Generator.Result.Success) {

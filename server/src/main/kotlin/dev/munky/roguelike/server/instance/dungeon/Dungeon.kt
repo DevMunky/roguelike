@@ -14,12 +14,9 @@ import net.hollowcube.schem.util.Rotation
 import net.kyori.adventure.title.TitlePart
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.BlockVec
-import net.minestom.server.coordinate.CoordConversion
 import net.minestom.server.entity.GameMode
 import net.minestom.server.instance.LightingChunk
 import java.util.*
-import kotlin.math.ceil
-import kotlin.math.floor
 
 class Dungeon private constructor(
     val roomset: RoomSet
@@ -66,7 +63,7 @@ class Dungeon private constructor(
             val generator = BackTrackingGenerator(roomset, maxDepth = 20, seed = System.nanoTime(), debug = isDebug)
             val plan = when (val generation = generator.plan()) {
                 Generator.Result.Failure.NO_POOL -> throw RuntimeException("No pool available..")
-                Generator.Result.Failure.EXCEEDED_DEPTH -> throw RuntimeException("Exceeded max depth.")
+                Generator.Result.Failure.DEPTH_EXCEEDED -> throw RuntimeException("Exceeded max depth.")
                 Generator.Result.Failure.NO_VALID_CONNECTION -> throw RuntimeException("No valid connection found.")
                 is Generator.Result.Success -> generation.room
             }
