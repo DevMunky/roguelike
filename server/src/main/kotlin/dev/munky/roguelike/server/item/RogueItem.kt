@@ -1,5 +1,6 @@
 package dev.munky.roguelike.server.item
 
+import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.MinecraftServer
@@ -16,7 +17,9 @@ import net.minestom.server.item.ItemStack
 import java.util.UUID
 import java.util.WeakHashMap
 
-sealed interface RogueItem : ItemStackSupplier {
+sealed interface RogueItem : ItemStackSupplier, RenderContext.Element {
+    override val key: RenderContext.Key<*> get() = Companion
+
     val uuid: UUID
 
     fun onLeftClick(player: RoguePlayer)
@@ -29,7 +32,7 @@ sealed interface RogueItem : ItemStackSupplier {
         data class Block(val block: net.minestom.server.instance.block.Block) : InteractTarget
     }
 
-    companion object {
+    companion object : RenderContext.Key<RogueItem> {
         val MAP = WeakHashMap<ItemStack, RogueItem>()
 
         val EVENT_NODE: EventNode<Event> = EventNode.all("${Roguelike.NAMESPACE}:item.events")

@@ -11,3 +11,6 @@
 local.properties
 
 **run/exampleworld/
+
+**.log
+**.hprof

@@ -1,22 +1,28 @@
 package dev.munky.roguelike.server.command
 
 import dev.munky.roguelike.common.launch
+import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
+import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.asComponent
+import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.Dungeon
+import dev.munky.roguelike.server.instance.dungeon.ModifierSelectRenderer
+import dev.munky.roguelike.server.item.DroppedItemRenderer
+import dev.munky.roguelike.server.item.RogueItem
 import dev.munky.roguelike.server.player.RoguePlayer
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
-import net.minestom.server.command.builder.arguments.Argument
 import net.minestom.server.command.builder.arguments.ArgumentType
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.EntityCreature
 import net.minestom.server.entity.EntityType
+import kotlin.math.PI
 import kotlin.random.Random
 
 fun helpCommand() = command("help") {
     executor { s, a ->
-        s.sendMessage("<test>Welcome to Roguelike. This is help.")
+        s.sendMessage("<test>Welcome to Roguelike. This is help.".asComponent())
     }
 }
 
@@ -32,7 +38,38 @@ fun spawnRandoms() = command("spawnrandoms") {
     }
 }
 
-fun testDungeon() = command("testdungeon") {
+fun testModifierSelect() = command("testModifierSelect") {
+    playerExecutor { s, _ ->
+        val instance = s.instance as RogueInstance
+        with(instance) {
+            RenderDispatch.with(ModifierSelectRenderer)
+                .with(RogueInstance, instance)
+                .with(RoguePlayer, s as RoguePlayer)
+                .with(ModifierSelectRenderer.ModifierSelection, Roguelike.server().modifiers().toList())
+                .with(RenderKey.Position, s.position)
+                .with(ModifierSelectRenderer.Width, PI / 2.0)
+                .with(ModifierSelectRenderer.Radius, 2.0)
+                .dispatchManaged()
+        }
+    }
+}
+
+fun testDropItem() = command("testDropItem") {
+    playerExecutor { s, _ ->
+        val instance = s.instance as RogueInstance
+        val player = s as RoguePlayer
+        with(instance) {
+            RenderDispatch.with(DroppedItemRenderer)
+                .with(RogueInstance, instance)
+                .with(RoguePlayer, player)
+                .with(RogueItem, player.character.weapon)
+                .with(RenderKey.Position, player.position.add(player.position.direction().mul(3.0)))
+                .dispatchManaged()
+        }
+    }
+}
+
+fun testDungeon() = command("testDungeon") {
     add(ArgumentType.String("roomset_id")) {
         playerExecutor{ s, c ->
             s.sendMessage("testing dungeon")

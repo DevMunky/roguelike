@@ -41,6 +41,20 @@ data class Ray(
     }
 
     /**
+     * Constructs a ray.
+     * @param origin the origin point
+     * @param vector the ray's path, which can have any nonzero length
+     * @param distance the maximum distance the ray will check
+     */
+    constructor(
+        origin: Point,
+        direction: Vec,
+        distance: Double,
+    ) : this(origin, direction.normalize(), distance, Vec.ONE.div(direction.normalize())) {
+        require(!direction.isZero) { "Ray may not have zero length" }
+    }
+
+    /**
      * An intersection found between a [Ray] and object of type [T].
      * @param T the type of object collided with
      * @param t the distance along the ray that the intersection was found

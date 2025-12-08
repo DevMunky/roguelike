@@ -5,13 +5,13 @@
     "roguelike:hallways": {
       "layout/hallway/door": 1,
       "layout/hallway/junction": 0.1,
-      "layout/hallway/left": 0.5,
-      "layout/hallway/right": 0.5,
+      "layout/hallway/left": 1,
+      "layout/hallway/right": 1,
       "layout/hallway/straight": 1
     },
     "roguelike:rooms": {
-      "layout/rooms/big": 1,
-      "layout/rooms/small_loot": 1,
+      "layout/rooms/big": 2,
+      "layout/rooms/small_loot": 0.8,
       "layout/rooms/drop": 1
     }
   },

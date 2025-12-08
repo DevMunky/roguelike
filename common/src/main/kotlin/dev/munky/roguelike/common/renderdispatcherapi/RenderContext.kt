@@ -33,6 +33,8 @@ sealed interface RenderContext : CoroutineScope {
     fun onDispose(block: suspend () -> Unit)
     fun dispose()
 
+    fun handle() : RenderHandle
+
     fun <T> watch(key: Key<T>, collector: FlowCollector<T?>): Job
     fun <T> watch(key: StableKey<T>, collector: FlowCollector<T>): Job
 

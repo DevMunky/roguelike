@@ -1,7 +1,9 @@
 package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.ModelPlatform
+import dev.munky.roguelike.server.command.testDropItem
 import dev.munky.roguelike.server.command.helpCommand
+import dev.munky.roguelike.server.command.testModifierSelect
 import dev.munky.roguelike.server.command.spawnRandoms
 import dev.munky.roguelike.server.command.testDungeon
 import dev.munky.roguelike.server.instance.InstanceManager
@@ -22,13 +24,8 @@ import dev.munky.roguelike.server.store.TransformingResourceStoreImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.BinaryFormat
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNamingStrategy
-import kotlinx.serialization.modules.EmptySerializersModule
-import kotlinx.serialization.modules.SerializersModule
 import net.benwoodworth.knbt.Nbt
 import net.benwoodworth.knbt.NbtCompression
 import net.benwoodworth.knbt.NbtVariant
@@ -173,6 +170,8 @@ class Roguelike private constructor() {
         MinecraftServer.getCommandManager().register(helpCommand())
         MinecraftServer.getCommandManager().register(spawnRandoms())
         MinecraftServer.getCommandManager().register(testDungeon())
+        MinecraftServer.getCommandManager().register(testModifierSelect())
+        MinecraftServer.getCommandManager().register(testDropItem())
     }
 
     companion object {

@@ -12,6 +12,7 @@ import net.kyori.adventure.nbt.BinaryTagIO
 import net.kyori.adventure.nbt.CompoundBinaryTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
+import net.minestom.server.entity.EntityType
 import java.io.ByteArrayOutputStream
 
 object MiniMessageSerializer : KSerializer<Component> by String.serializer().xmap(
@@ -34,4 +35,9 @@ object StructureSerializer : KSerializer<Structure> by BinaryTagSerializer.xmap(
         }
         SchematicReader.structure().read(os.toByteArray()) as Structure
     }
+)
+
+object EntityTypeSerializer : KSerializer<EntityType> by String.serializer().xmap(
+    { key().asString() },
+    { EntityType.fromKey(this) ?: error("Unknown entity type '$this'.") },
 )

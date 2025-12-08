@@ -1,6 +1,5 @@
 package dev.munky.roguelike.common.renderdispatcherapi
 
-import dev.munky.roguelike.common.logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
 
@@ -9,38 +8,22 @@ import kotlinx.coroutines.DisposableHandle
  *
  * [Renderer] implementations may dispose the [RenderHandle] themselves.
  */
-class RenderHandle internal constructor(
-    internal val rawHandle: Int
+@JvmInline
+value class RenderHandle internal constructor(
+    private val rawHandle: Int
 ) : DisposableHandle {
-    var isDisposed = false
-        private set
-
     /**
      * @return The context associated with this handle.
      */
-    val context: RenderContext
-        get() {
-            if (isDisposed) error("This handle has been disposed, and the context has been reclaimed ($this).")
-            val ctx = RenderDispatcher[rawHandle] ?: error("This handle is invalid ($this).")
-            return ctx
-        }
+    val context: RenderContext? get() = RenderDispatcher[rawHandle]
 
-    override fun dispose() {
-        RenderDispatcher.dispose(rawHandle)
-        isDisposed = true
-    }
+    val isDisposed get() = RenderDispatcher[rawHandle] == null
 
-    override fun toString(): String {
-        return "RenderHandle{${RenderDispatcher.debugHandle(rawHandle)}}"
-    }
+    override fun dispose() = RenderDispatcher.dispose(rawHandle)
+
+    override fun toString(): String = "RenderHandle{${RenderDispatcher.debugHandle(rawHandle)}}"
 
     companion object {
-        private val LOGGER = logger {}
-
         val EMPTY = RenderHandle(RenderDispatcher.EMPTY_HANDLE)
-
-        init {
-            EMPTY.isDisposed = true
-        }
     }
 }

@@ -106,7 +106,7 @@ internal object RenderDispatcher {
         }
 
         fun remove(handle: Int): InternalRenderContext? {
-            if (handle == INVALID_HANDLE) error("Invalid handle.")
+            if (handle == INVALID_HANDLE) throw IllegalArgumentException("invalid handle")
             val ind = validHandleOf(handle)?.getIndex() ?: return null
             val r = contexts[ind]
             contexts[ind] = null
@@ -124,7 +124,7 @@ internal object RenderDispatcher {
                 ci = i - 1
                 return ci
             }
-            return ci++
+            return ci++.let { if (it > UShort.MAX_VALUE.toInt()) error("index out of bounds") else it }
         }
 
         private fun grow() {
@@ -139,9 +139,9 @@ internal object RenderDispatcher {
         }
 
         @Suppress("NOTHING_TO_INLINE")
-        private inline fun Int.getIndex(): Int = this and 0x00_FF_FF_FF
+        private inline fun Int.getIndex(): Int = this and 0x00_00_FF_FF
         @Suppress("NOTHING_TO_INLINE")
-        private inline fun Int.getSlotCount(): UShort = ((this and 0xFF_00_00_00.toInt()) shr 24).toUShort()
+        private inline fun Int.getSlotCount(): UShort = (this shr 16).toUShort()
 
         operator fun get(handle: Int): RenderContext? = contextWrappedOf(handle)
 
@@ -170,7 +170,7 @@ internal object RenderDispatcher {
             val slotCount = slotCounts[index].plus(1u).toUShort()
             if (slotCount + 1u > UShort.MAX_VALUE) error("Slot Count overflow! RenderDispatch Spam?")
             slotCounts[index] = slotCount
-            val handle = index or (slotCount.toInt() shl 24)
+            val handle = index or (slotCount.toInt() shl 16)
             return handle
         }
 
@@ -179,11 +179,10 @@ internal object RenderDispatcher {
             if (handle == EMPTY_HANDLE) return "Handle{EMPTY_HANDLE}"
             val index = handle.getIndex()
             return "Handle{" +
-                    "ind=$index," +
+                    "index=$index," +
                     "slot=${handle.getSlotCount()}}," +
-                    "dispatcher{slot=${slotCounts.getOrNull(index)?.toInt() ?: "null"}," +
-                    "context=${contexts[index].let { if (it == null) "null" else "exists" }}" +
-                    "}"
+                    "dispatcher{index=${contexts[index]?.let { "exists" } ?: "null"}," +
+                    "slot=${slotCounts.getOrNull(index)}}"
         }
 
         companion object {
@@ -204,6 +203,7 @@ internal object RenderDispatcher {
         override fun <T> watch(key: RenderContext.Key<T>, collector: FlowCollector<T?>): Job = ctx.watch(key, collector)
         override fun <T> watch(key: RenderContext.StableKey<T>, collector: FlowCollector<T>): Job = ctx.watch(key, collector)
         override fun <T> watchAndRequire(key: RenderContext.Key<T>, collector: FlowCollector<T>): Job = ctx.watchAndRequire(key, collector)
+        override fun handle(): RenderHandle = ctx.handle()
         override val coroutineContext: CoroutineContext get() = ctx.coroutineContext
     }
 }

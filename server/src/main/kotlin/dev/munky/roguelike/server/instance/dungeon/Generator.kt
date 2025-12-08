@@ -7,16 +7,18 @@ import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
 import dev.munky.roguelike.server.interact.Region
 import net.hollowcube.schem.util.Rotation
 import net.minestom.server.coordinate.BlockVec
-import net.minestom.server.coordinate.CoordConversion
 import dev.munky.roguelike.common.WeightedRandomList
 import java.util.Random
-import kotlin.math.ceil
-import kotlin.math.floor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import java.util.LinkedList
+import java.util.TreeMap
+import kotlin.math.max
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 interface Generator {
     suspend fun plan() : Result
@@ -53,6 +55,11 @@ data class PlannedRoom(
         result = 31 * result + position.hashCode()
         return result
     }
+
+    override fun toString(): String {
+        return "PlannedRoom(bounds=$bounds, rotation=$rotation, position=$position, blueprint=$blueprint, connections=${connections.entries.joinToString { "${it.key.name}: ${it.value?.blueprint?.id}" }})"
+    }
+
 }
 /**
  * Planning-only dungeon generator that builds a graph of rooms using bounds checks
@@ -67,35 +74,73 @@ class BackTrackingGenerator(
     private val minY: Int = -64,
     private val maxY: Int = 319
 ) : Generator {
+    var stats = Stats()
+
+    data class Stats(
+        var roomsPlanned: Long = 0L,
+        var chunksChecked: Long = 0L,
+
+        var descends: Long = 0L,
+        var ascends: Long = 0L,
+
+        var intersectionsChecked: Long = 0L,
+        var intersectionsFailed: Long = 0L,
+
+        var candidatesTried: Long = 0L,
+        var spatialBinAccesses: Long = 0L,
+        var spatialBinCopies: Long = 0L,
+        var spatialBinAverageCopySize: Double = .0,
+        var spatialBinMaxSize: Long = 0L,
+
+        var heightBoundsFails: Long = 0L,
+        var timeTaken: Duration = 0.milliseconds,
+    )
+
     val random = Random(seed)
 
     // Transient spatial index: chunk index -> set of planned bounds
-    private val spatialPlan = HashMap<Long, LinkedList<PlannedRoom>>()
+    private val spatialBin = TreeMap<Long, LinkedList<PlannedRoom>>()
 
     override suspend fun plan(): Generator.Result {
-        logDebug { "plan(): start — root='${roomset.rootRoomId}', maxDepth=$maxDepth, seed=$seed" }
+        val start = TimeSource.Monotonic.markNow()
+        LOGGER.info("Starting generator for roomset '${roomset.id}'.")
+        logDebug { "plan(): maxDepth=$maxDepth, seed=$seed" }
         val rootBp = roomset.rooms[roomset.rootRoomId]
             ?: error("No root room '${roomset.rootRoomId}' defined.")
 
         // Place root at origin with a default rotation (match previous behavior)
         val rootRotation = Rotation.CLOCKWISE_90
-        val rootBounds = rootBp.regionBy(BlockVec.ZERO, rootRotation)
+        val rootBounds = rootBp.regionAt(BlockVec(0, 100, 0), rootRotation)
 
         val root = PlannedRoom(
             blueprint = rootBp,
-            position = BlockVec.ZERO,
+            position = BlockVec(0, 100, 0),
             rotation = rootRotation,
             bounds = rootBounds,
-            connections = rootBp.connectionsBy(rootRotation).associateWithTo(LinkedHashMap()) { null }
+            connections = rootBp.connectionsWith(rootRotation).associateWithTo(LinkedHashMap()) { null }
         )
-        index(containedChunksOf(rootBounds), root)
+        index(rootBounds.containedChunks(), root)
         logDebug {
-            "plan(): placed root room '${rootBp.id}' at ${BlockVec.ZERO} rot=$rootRotation; openConns=${root.connections.size}; spatialBuckets=${spatialPlan.size}"
+            "plan(): placed root room '${rootBp.id}' at ${BlockVec.ZERO} rot=$rootRotation; openConns=${root.connections.size}; spatialBuckets=${spatialBin.size}"
         }
 
-        return generate(root, maxDepth)
+        var tries = 20
+        while (tries-- > 0) {
+            when (val r = generate(root, maxDepth)) {
+                is Generator.Result.Success -> {
+                    stats.timeTaken = TimeSource.Monotonic.markNow().minus(start)
+                    return r
+                }
+                else -> LOGGER.warn("Could not generate connection at root, $tries left.")
+            }
+        }
+        stats.timeTaken = TimeSource.Monotonic.markNow().minus(start)
+        return Generator.Result.Failure.NO_VALID_CONNECTION
     }
 
+    /**
+     * Generate a room for a connection on a room.
+     */
     private suspend fun generate(room: PlannedRoom, depth: Int): Generator.Result {
         // We must satisfy ALL open connections of this room (and their descendants)
         if (depth < 0) {
@@ -103,8 +148,7 @@ class BackTrackingGenerator(
             return Generator.Result.Failure.DEPTH_EXCEEDED
         }
 
-        val open = room.connections.keys.filter { room.connections[it] == null }
-        if (open.isEmpty()) {
+        if (null !in room.connections.values) {
             return Generator.Result.Success(room)
         }
 
@@ -117,6 +161,9 @@ class BackTrackingGenerator(
         return satisfyConnection(room, depth, conn, pool)
     }
 
+    /**
+     * Satisfy the connection of a room.
+     */
     private suspend fun satisfyConnection(
         room: PlannedRoom,
         depth: Int,
@@ -124,9 +171,11 @@ class BackTrackingGenerator(
         pool: WeightedRandomList<String>
     ): Generator.Result {
         // Build a read-only snapshot of the spatial plan for worker threads
-        val snapshot = buildMap(spatialPlan.size) {
-            for ((k, v) in spatialPlan) put(k, LinkedList(v))
+        val snapshot = buildMap(spatialBin.size) {
+            for ((k, v) in spatialBin) put(k, LinkedList(v))
         }
+        stats.spatialBinCopies++
+        stats.spatialBinAverageCopySize = (snapshot.size + stats.spatialBinCopies * stats.spatialBinAverageCopySize) / (stats.spatialBinCopies.toDouble() + 1)
 
         val candidates = computeCandidates(room, conn, pool, snapshot)
         if (candidates.isEmpty()) {
@@ -140,12 +189,14 @@ class BackTrackingGenerator(
                 position = candidateData.pos,
                 rotation = candidateData.rot,
                 bounds = candidateData.region,
-                connections = candidateData.allConns.associateWithTo(LinkedHashMap()) { null }
+                connections = candidateData.connections.associateWithTo(LinkedHashMap()) { null }
             )
 
             room.connections[conn] = candidate
             candidate.connections[candidateData.matchedConn] = room
             index(candidateData.chunks, candidate)
+            stats.roomsPlanned++
+            stats.descends++
 
             logDebug { "satisfyConnection(): descending into ${candidate.blueprint.id}." }
 
@@ -159,6 +210,8 @@ class BackTrackingGenerator(
             }
 
             logDebug { "satisfyConnection(): back tracking ${candidate.blueprint.id}." }
+            stats.roomsPlanned--
+            stats.ascends++
             unindex(candidateData.chunks, candidate)
             room.connections[conn] = null
             candidate.connections[candidateData.matchedConn] = null
@@ -193,13 +246,15 @@ class BackTrackingGenerator(
 
     private fun index(chunks: LongArray, pr: PlannedRoom) {
         for (chunk in chunks) {
-            spatialPlan.getOrPut(chunk, ::LinkedList).add(pr)
+            stats.spatialBinAccesses++
+            spatialBin.getOrPut(chunk, ::LinkedList).add(pr)
+            stats.spatialBinMaxSize = max(stats.spatialBinMaxSize, spatialBin.size.toLong())
         }
     }
 
     private fun unindex(chunks: LongArray, pr: PlannedRoom) {
         for (chunk in chunks) {
-            spatialPlan[chunk]?.remove(pr)
+            spatialBin[chunk]?.remove(pr)
         }
     }
 
@@ -209,9 +264,16 @@ class BackTrackingGenerator(
         candidate: Region,
         snap: Map<Long, LinkedList<PlannedRoom>>
     ): Boolean {
+        stats.chunksChecked += chunks.size
         for (c in chunks) {
             val possible = snap[c] ?: continue
-            for (r in possible) if (r.bounds.intersectsAabb(candidate)) return true
+            for (r in possible) {
+                stats.intersectionsChecked++
+                if (r.bounds.intersectsAabb(candidate)) {
+                    stats.intersectionsFailed++
+                    return true
+                }
+            }
         }
         return false
     }
@@ -222,7 +284,7 @@ class BackTrackingGenerator(
         val rot: Rotation,
         val pos: BlockVec,
         val region: Region,
-        val allConns: List<JigsawConnection>,
+        val connections: List<JigsawConnection>,
         val matchedConn: JigsawConnection,
         val chunks: LongArray
     )
@@ -246,23 +308,28 @@ class BackTrackingGenerator(
         for (roomId in sampled) {
             val bp = roomset.rooms[roomId] ?: continue
             for (rot in Rotation.entries) {
-                val candidateConnections = bp.connectionsBy(rot)
+                val candidateConnections = bp.connectionsWith(rot)
                 for (c in candidateConnections) {
                     if (c.pool != conn.pool) continue
                     if (c.direction != inverted) continue
                     tasks += async(Dispatchers.Default) {
+                        stats.candidatesTried++
                         val candidatePos = computeCandidatePosition(owner, conn, c)
-                        val candidateRegion = bp.regionBy(candidatePos, rot)
+                        val candidateRegion = bp.regionAt(candidatePos, rot)
                         val candidateBounds = candidateRegion.expand(-0.1)
-                        val candidateChunks = containedChunksOf(candidateBounds)
-                        if (!isWithinHeight(candidateBounds)) return@async null
+                        val candidateChunks = candidateBounds.containedChunks()
+
+                        if (!isWithinHeight(candidateBounds)) {
+                            stats.heightBoundsFails++
+                            return@async null
+                        }
                         if (isIntersectingSnapshot(candidateChunks, candidateBounds, snapshot)) return@async null
                         CandidateResult(
                             bp = bp,
                             rot = rot,
                             pos = candidatePos,
                             region = candidateRegion,
-                            allConns = candidateConnections,
+                            connections = candidateConnections,
                             matchedConn = c,
                             chunks = candidateChunks
                         )
@@ -273,28 +340,6 @@ class BackTrackingGenerator(
 
         if (tasks.isEmpty()) return@coroutineScope emptyList()
         tasks.awaitAll().filterNotNull()
-    }
-
-    private fun containedChunksOf(area: Region): LongArray {
-        val min = area.boundingBox.min
-        val max = area.boundingBox.max
-
-        val minChunkX = CoordConversion.globalToChunk(floor(min.x()).toInt())
-        val minChunkZ = CoordConversion.globalToChunk(floor(min.z()).toInt())
-        val maxChunkX = CoordConversion.globalToChunk(ceil(max.x()).toInt())
-        val maxChunkZ = CoordConversion.globalToChunk(ceil(max.z()).toInt())
-
-        val chunksX = maxChunkX - minChunkX + 1
-        val chunksZ = maxChunkZ - minChunkZ + 1
-
-        val result = LongArray(chunksX * chunksZ)
-        var i = 0
-        for (x in minChunkX..maxChunkX) {
-            for (z in minChunkZ..maxChunkZ) {
-                result[i++] = CoordConversion.chunkIndex(x, z)
-            }
-        }
-        return result
     }
 
     private fun isWithinHeight(area: Region): Boolean {

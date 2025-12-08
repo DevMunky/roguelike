@@ -9,6 +9,7 @@ import dev.munky.roguelike.server.toJoml
 import kotlinx.coroutines.*
 import net.minestom.server.MinecraftServer
 import net.minestom.server.color.Color
+import net.minestom.server.coordinate.CoordConversion
 import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
 import net.minestom.server.event.trait.PlayerEvent
@@ -16,6 +17,8 @@ import net.minestom.server.network.packet.server.play.ParticlePacket
 import net.minestom.server.particle.Particle
 import org.joml.Vector3d
 import org.joml.Vector3dc
+import kotlin.math.ceil
+import kotlin.math.floor
 
 interface Region {
     /**
@@ -41,6 +44,28 @@ interface Region {
      * false means they definitely do not intersect.
      */
     fun intersectsAabb(other: Region): Boolean = this.boundingBox.intersects(other.boundingBox)
+
+    fun containedChunks(): LongArray {
+        val min = boundingBox.min
+        val max = boundingBox.max
+
+        val minChunkX = CoordConversion.globalToChunk(floor(min.x()).toInt())
+        val minChunkZ = CoordConversion.globalToChunk(floor(min.z()).toInt())
+        val maxChunkX = CoordConversion.globalToChunk(ceil(max.x()).toInt())
+        val maxChunkZ = CoordConversion.globalToChunk(ceil(max.z()).toInt())
+
+        val chunksX = maxChunkX - minChunkX + 1
+        val chunksZ = maxChunkZ - minChunkZ + 1
+
+        val result = LongArray(chunksX * chunksZ)
+        var i = 0
+        for (x in minChunkX..maxChunkX) {
+            for (z in minChunkZ..maxChunkZ) {
+                result[i++] = CoordConversion.chunkIndex(x, z)
+            }
+        }
+        return result
+    }
 
     data class Sphere(val center: Vector3dc, val radius: Double) : Region {
         override fun expand(amount: Double): Region = copy(radius = radius + amount)
@@ -100,8 +125,8 @@ interface Region {
         override val boundingBox: Cuboid = this
 
         override fun expand(amount: Double): Region = copy(
-            min = min.sub(Vector3d(amount), Vector3d()),
-            max = max.add(Vector3d(amount), Vector3d())
+            min = min.sub(amount, amount, amount, Vector3d()),
+            max = max.add(amount, amount, amount, Vector3d())
         )
 
         override fun contains(p: Vector3dc): Boolean {

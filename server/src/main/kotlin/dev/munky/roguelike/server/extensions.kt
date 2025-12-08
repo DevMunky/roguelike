@@ -46,36 +46,3 @@ fun Point.rotateCenter(rotation: Rotation): Point = when (rotation) {
     Rotation.CLOCKWISE_270 ->
         Vec(z(), y(), -x())
 }
-
-/**
- * Rotates `orientation` as well as `facing` and fence properties.
- */
-fun Block.rotate(rotation: Rotation): Block {
-    var block = CoordinateUtil.rotateBlock(this, rotation)
-    block.getProperty("orientation")?.let { block = rotateOrientation(block, it, rotation) }
-    return block
-}
-
-private fun rotateOrientation(block: Block, orientation: String, rotation: Rotation): Block = when (rotation) {
-    Rotation.NONE -> block
-    Rotation.CLOCKWISE_90 -> block.withProperty(
-        "orientation",
-        orientation.rotateOrientation90()
-    )
-    Rotation.CLOCKWISE_180 -> block.withProperty(
-        "orientation",
-        orientation.rotateOrientation90().rotateOrientation90()
-    )
-    Rotation.CLOCKWISE_270 -> block.withProperty(
-        "orientation",
-        orientation.rotateOrientation90().rotateOrientation90().rotateOrientation90()
-    )
-}
-
-private fun String?.rotateOrientation90() = when(this) {
-    "north_up" -> "east_up"
-    "south_up" -> "west_up"
-    "east_up" -> "south_up"
-    "west_up" -> "north_up"
-    else -> this
-}

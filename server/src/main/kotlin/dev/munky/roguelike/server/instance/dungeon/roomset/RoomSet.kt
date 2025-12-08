@@ -8,12 +8,13 @@ import dev.munky.roguelike.server.loadChunksInGlobal
 import dev.munky.roguelike.server.rotate
 import dev.munky.roguelike.server.toJoml
 import kotlinx.coroutines.*
+import kotlinx.coroutines.future.asDeferred
+import kotlinx.coroutines.future.await
 import kotlinx.serialization.Serializable
 import net.hollowcube.schem.BlockEntityData
 import net.hollowcube.schem.Structure
 import net.hollowcube.schem.util.Rotation
 import net.minestom.server.MinecraftServer
-import net.minestom.server.coordinate.Area
 import net.minestom.server.coordinate.BlockVec
 import net.minestom.server.coordinate.CoordConversion
 import net.minestom.server.coordinate.Point
@@ -23,6 +24,7 @@ import net.minestom.server.instance.Instance
 import net.minestom.server.instance.block.Block
 import net.minestom.server.utils.Direction
 import java.util.EnumMap
+import java.util.LinkedHashMap
 
 class RoomSet private constructor(val data: RoomSetData) {
     val id = data.id
@@ -39,7 +41,7 @@ class RoomSet private constructor(val data: RoomSetData) {
     }
 
     private suspend fun createRooms() : Map<String, RoomBlueprint> = coroutineScope {
-        val rooms = HashMap<String, RoomBlueprint>()
+        val rooms = LinkedHashMap<String, RoomBlueprint>()
         for (room in data.rooms) {
             val room = RoomBlueprint(room.key, this@RoomSet, room.value)
             rooms[room.id] = room
@@ -77,7 +79,7 @@ data class RoomBlueprint(
         }
     }
 
-    fun connectionsBy(rotation: Rotation) : List<JigsawConnection> {
+    fun connectionsWith(rotation: Rotation) : List<JigsawConnection> {
         connectionCache[rotation]?.let {
             return it
         }
@@ -128,7 +130,7 @@ data class RoomBlueprint(
         return result
     }
 
-    fun regionBy(at: Point, rotation: Rotation) : Region.Cuboid {
+    fun regionAt(at: Point, rotation: Rotation) : Region.Cuboid {
         val r = regionCache.getOrPut(rotation) { computeRegion(rotation) }
         return r.offset(at.toJoml()) as Region.Cuboid
     }
@@ -139,31 +141,29 @@ data class RoomBlueprint(
         return Region.Cuboid(min.toJoml(), max.toJoml())
     }
 
-    fun areaBy(at: Point, rotation: Rotation) : Area.Cuboid {
-        // 'at' is expected to be the center of the structure (XYZ). Compute min corner from center.
-        val minCorner = centerToMin(at, rotation)
-        val max = minCorner.add(rotatedSize(rotation)).asBlockVec()
-        return Area.cuboid(minCorner, max)
-    }
-
     /**
      * Returns the area of this room post-rotation.
      */
     suspend fun paste(instance: Instance, at: Point, rotation: Rotation = Rotation.NONE) : Region.Cuboid {
-        val area = areaBy(at, rotation)
-        val min = area.min()
-        val max = area.max()
+        val area = regionAt(at, rotation)
+        val min = area.min
 
-        instance.loadChunksInGlobal(min.blockX to max.blockX, min.blockZ to max.blockZ)
+        val chunks = area.containedChunks()
+        val tasks = ArrayList<Deferred<*>>()
+        for (chunk in chunks) tasks += instance.loadChunk(
+            CoordConversion.chunkIndexGetX(chunk),
+            CoordConversion.chunkIndexGetZ(chunk)
+        ).asDeferred()
+        tasks.joinAll()
 
-        setBlocksUnsafe(instance, min, rotation)
-        return Region.Cuboid(min.toJoml(), max.toJoml())
+        setBlocksUnsafe(instance, min.x(), min.y(), min.z(), rotation)
+        return area
     }
 
     /**
      * Does not load chunks, ensure chunks are loaded before calling.
      */
-    private suspend fun setBlocksUnsafe(instance: Instance, at: BlockVec, rotation: Rotation) {
+    private suspend fun setBlocksUnsafe(instance: Instance, x: Double, y: Double, z: Double, rotation: Rotation) {
         val blockMgr = MinecraftServer.getBlockManager()
         val changedChunks = HashSet<Chunk>()
         withContext(Dispatchers.IO) {
@@ -194,12 +194,12 @@ data class RoomBlueprint(
                 }
                 // rotated local position, then translate by min
                 val localRot = rotateAboutCenter(bi.pos, rotation)
-                val pos: Point = at.add(localRot)
+                val pos: Point = localRot.add(x, y, z)
                 block = block.rotate(rotation)
 
                 val cx = CoordConversion.globalToChunk(pos.x())
                 val cz = CoordConversion.globalToChunk(pos.z())
-                chunk = instance.getChunk(cx, cz) ?: error("Chunk at $cx,$cz not loaded.")
+                chunk = instance.getChunk(cx, cz) ?: error("chunk $cx, $cz not loaded")
                 synchronized(chunk) {
                     chunk.setBlock(pos, block)
                 }

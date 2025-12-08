@@ -1,6 +1,10 @@
 package dev.munky.roguelike.server.instance.dungeon
 
 import dev.munky.roguelike.common.logger
+import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
+import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
+import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
+import dev.munky.roguelike.common.renderdispatcherapi.RenderHandleManager
 import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.roomset.JigsawConnection
@@ -10,13 +14,17 @@ import dev.munky.roguelike.server.instance.town.TownInstance.Companion.TOWN_DIME
 import dev.munky.roguelike.server.interact.InteractableRegion
 import dev.munky.roguelike.server.interact.Region
 import dev.munky.roguelike.server.player.RoguePlayer
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import net.hollowcube.schem.util.Rotation
 import net.kyori.adventure.title.TitlePart
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.BlockVec
+import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.GameMode
 import net.minestom.server.instance.LightingChunk
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 class Dungeon private constructor(
     val roomset: RoomSet
@@ -59,8 +67,8 @@ class Dungeon private constructor(
 
     private suspend fun initialize() {
         // place root room at origin
+        val generator = BackTrackingGenerator(roomset, maxDepth = 50, seed = System.nanoTime(), debug = false)
         try {
-            val generator = BackTrackingGenerator(roomset, maxDepth = 20, seed = System.nanoTime(), debug = isDebug)
             val plan = when (val generation = generator.plan()) {
                 Generator.Result.Failure.NO_POOL -> throw RuntimeException("No pool available..")
                 Generator.Result.Failure.DEPTH_EXCEEDED -> throw RuntimeException("Exceeded max depth.")
@@ -68,17 +76,14 @@ class Dungeon private constructor(
                 is Generator.Result.Success -> generation.room
             }
 
+            LOGGER.info("Commiting plan for roomset '${roomset.id}'.")
             rootRoom = commitPlan(plan)
 
-            for (player in players) {
-                player.sendTitlePart(TitlePart.TITLE,"<green>Dungeon generated".asComponent())
-            }
+            LOGGER.info("Done generating.")
         } catch (t: Throwable) {
-            for (player in players) {
-                player.sendTitlePart(TitlePart.TITLE,"<red>Dungeon generation failed".asComponent())
-                player.sendTitlePart(TitlePart.SUBTITLE,"<red>${t.message ?: "no reason"}".asComponent())
-            }
             throw RuntimeException("Exception caught initializing dungeon.", t)
+        } finally {
+            LOGGER.debug("Generation planning stats = {}", generator.stats)
         }
     }
 
@@ -103,7 +108,7 @@ class Dungeon private constructor(
             if (plannedToReal.containsKey(pr)) continue
 
             val connections = HashMap<JigsawConnection, Room?>(pr.connections.size)
-            pr.blueprint.connectionsBy(pr.rotation).associateWithTo(connections) { null as Room? }
+            pr.blueprint.connectionsWith(pr.rotation).associateWithTo(connections) { null as Room? }
 
             val room = createRoom(pr.blueprint, connections, pr.position, pr.rotation)
             plannedToReal[pr] = room
@@ -142,7 +147,15 @@ class Dungeon private constructor(
         val connections: MutableMap<JigsawConnection, Room?>,
         val position: BlockVec,
         override val region: Region
-    ) : InteractableRegion {
+    ) : InteractableRegion, RenderHandleManager, RenderContext.Element {
+        override val key: RenderContext.Key<*> = Companion
+        val renderHandles = HashMap<RoguePlayer, ArrayList<RenderHandle>>()
+
+        override fun RenderDispatch.dispatchManaged() {
+            val player = data[RoguePlayer] as? RoguePlayer ?: return
+            renderHandles.getOrPut(player, ::ArrayList).add(dispatch())
+        }
+
         override val thickness: Double = 0.666
 
         override fun onEnter(player: RoguePlayer) {
@@ -150,8 +163,11 @@ class Dungeon private constructor(
         }
 
         override fun onExit(player: RoguePlayer) {
+            renderHandles.remove(player)?.forEach { it.dispose() }
             player.sendMessage("Exited room ${blueprint.id}")
         }
+
+        companion object : RenderContext.Key<Room>
     }
 
     companion object {
@@ -162,7 +178,7 @@ class Dungeon private constructor(
             MinecraftServer.getInstanceManager().registerInstance(this)
             if (players.all { it.isDebug }) isDebug = true
             for (player in players) {
-                player.setInstance(this, BlockVec.ZERO)
+                player.setInstance(this, Pos(.0, 110.0, .0))
             }
         }
     }

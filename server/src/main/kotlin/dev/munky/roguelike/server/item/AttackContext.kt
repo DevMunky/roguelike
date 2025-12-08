@@ -3,6 +3,7 @@ package dev.munky.roguelike.server.item
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.coordinate.Vec
+import net.minestom.server.entity.EntityType
 import net.minestom.server.entity.LivingEntity
 import net.minestom.server.entity.damage.Damage
 import net.minestom.server.entity.damage.DamageType
@@ -36,9 +37,13 @@ sealed interface AttackCommand {
     }
 
     data class Ignite(val target: LivingEntity, val damage: Float) : AttackCommand {
-        override fun execute(instance: RogueInstance, player: RoguePlayer) {
-            spawnParticlesAround(instance, target, Particle.FLAME, 20)
-            target.damage(Damage(DamageType.ON_FIRE, player, null, null, damage))
+        override fun execute(instance: RogueInstance, player: RoguePlayer) = when (target.entityType) {
+            EntityType.ITEM_DISPLAY, EntityType.TEXT_DISPLAY,
+            EntityType.BLOCK_DISPLAY, EntityType.INTERACTION -> {}
+            else -> {
+                target.damage(Damage(DamageType.ON_FIRE, player, null, null, damage))
+                spawnParticlesAround(instance, target, Particle.FLAME, 20)
+            }
         }
     }
 }

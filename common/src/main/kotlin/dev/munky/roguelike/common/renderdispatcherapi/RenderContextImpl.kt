@@ -84,6 +84,7 @@ internal data class RenderContextImpl(
     }
 
     override fun dispose() = RenderDispatcher.dispose(rawHandle)
+    override fun handle(): RenderHandle = RenderHandle(rawHandle)
 
     /**
      * If desired, run the disposer in an event loop on this thread, finalizing upon completion.

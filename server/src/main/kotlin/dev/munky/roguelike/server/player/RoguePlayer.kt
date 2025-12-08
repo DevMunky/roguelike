@@ -39,14 +39,13 @@ class RoguePlayer(connection: PlayerConnection, profile: GameProfile) : Player(c
             character = character.copy(data = character.data.copy(weaponData = value))
             refreshLoadout()
         }
-    val weapon get() = character.weapon
 
     init {
         getAttribute(Attribute.ENTITY_INTERACTION_RANGE).addModifier(DEFAULT_ENTITY_INTERACTION_MODIFIER)
     }
 
     fun refreshLoadout() {
-        inventory.setItemStack(0, weapon.buildItemStack())
+        inventory.setItemStack(0, character.weapon.buildItemStack())
     }
 
     override fun spawn() {
