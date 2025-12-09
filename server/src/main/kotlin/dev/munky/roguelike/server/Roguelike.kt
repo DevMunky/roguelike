@@ -1,11 +1,7 @@
 package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.ModelPlatform
-import dev.munky.roguelike.server.command.testDropItem
-import dev.munky.roguelike.server.command.helpCommand
-import dev.munky.roguelike.server.command.testModifierSelect
-import dev.munky.roguelike.server.command.spawnRandoms
-import dev.munky.roguelike.server.command.testDungeon
+import dev.munky.roguelike.server.command.*
 import dev.munky.roguelike.server.instance.InstanceManager
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
@@ -16,11 +12,7 @@ import dev.munky.roguelike.server.item.RogueItem
 import dev.munky.roguelike.server.item.modifier.ModifierData
 import dev.munky.roguelike.server.player.AccountData
 import dev.munky.roguelike.server.player.RoguePlayer
-import dev.munky.roguelike.server.store.DynamicResourceStore
-import dev.munky.roguelike.server.store.DynamicResourceStoreImpl
-import dev.munky.roguelike.server.store.ResourceStore
-import dev.munky.roguelike.server.store.ResourceStoreImpl
-import dev.munky.roguelike.server.store.TransformingResourceStoreImpl
+import dev.munky.roguelike.server.store.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -30,12 +22,24 @@ import net.benwoodworth.knbt.Nbt
 import net.benwoodworth.knbt.NbtCompression
 import net.benwoodworth.knbt.NbtVariant
 import net.hollowcube.schem.Structure
+import net.kyori.adventure.text.Component
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.ServerProcess
+import net.minestom.server.event.server.ServerListPingEvent
+import net.minestom.server.ping.Status
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.util.*
+import javax.imageio.ImageIO
 import kotlin.io.path.Path
+import kotlin.random.Random
+
 
 class Roguelike private constructor() {
+    private var favicon: String = ""
+    private var description: Component = Component.empty()
+
     private lateinit var mc: MinecraftServer
     fun process() : ServerProcess = MinecraftServer.process()
 
@@ -122,6 +126,20 @@ class Roguelike private constructor() {
         System.setProperty("minestom.dispatcher-threads", "$count")
     }
 
+    fun favicon(input: InputStream) {
+        val image = ImageIO.read(input)
+        val outputStream = ByteArrayOutputStream()
+        outputStream.use {
+            ImageIO.write(image, "png", it)
+        }
+        val data = Base64.getEncoder().encodeToString(outputStream.toByteArray())
+        favicon = "data:image/png;base64,$data"
+    }
+
+    fun description(component: Component) {
+        description = component
+    }
+
     /**
      * Cannot modify [net.minestom.server.ServerFlag] beyond this point.
      */
@@ -147,6 +165,28 @@ class Roguelike private constructor() {
         MinecraftServer.setBrandName("roguelike")
         MinecraftServer.getConnectionManager().setPlayerProvider(::RoguePlayer)
         MinecraftServer.getDimensionTypeRegistry().register("${NAMESPACE}:main_menu", MENU_DIMENSION)
+
+        val status = Status.builder()
+            .favicon(favicon.toByteArray())
+            .description(description)
+            .versionInfo(Status.VersionInfo.DEFAULT)
+        favicon = ""
+        val playerInfo = Status.PlayerInfo.builder()
+            .onlinePlayers(MinecraftServer.getConnectionManager().onlinePlayerCount)
+            .maxPlayers(100)
+            .apply {
+                // I really cant make this any bigger
+                repeat(60) {
+                    sample("<obfuscated>${"_".repeat(180)}".asComponent())
+                }
+            }
+        MinecraftServer.getGlobalEventHandler().addListener(ServerListPingEvent::class.java) {
+            it.status = status
+                .playerInfo(playerInfo
+                    .onlinePlayers(MinecraftServer.getConnectionManager().onlinePlayerCount)
+                    .build())
+                .build()
+        }
 
         registerCommands()
         registerBlockHandlers()

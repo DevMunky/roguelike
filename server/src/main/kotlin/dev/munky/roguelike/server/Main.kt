@@ -35,6 +35,11 @@ suspend fun main(vararg args: String) {
 
     Roguelike.build {
         dispatchThreads(3)
+        val favIs = javaClass.getResourceAsStream("/favicon.png") ?: error("No favicon found")
+        favIs.use {
+            favicon(it)
+        }
+        description("<green>Roguelike".asComponent())
         init(Auth.Online())
     }
 

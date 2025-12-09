@@ -6,7 +6,7 @@
         <!-- The vertical line char here is 'Box Drawings Light Vertical'; │  -->
         <encoder>
             <pattern>
-                %date{HH:mm:ss.SSS} │ %12.-12thread │ %25.25logger{20} │ %levelString │ %msg%n
+                %date{HH:mm:ss.SSS} │ %12.-12thread │ %20.-20class{0}#%-12.-12method │%levelString│ %msg%n
             </pattern>
         </encoder>
     </appender>
