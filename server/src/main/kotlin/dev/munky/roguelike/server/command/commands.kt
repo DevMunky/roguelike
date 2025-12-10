@@ -5,6 +5,7 @@ import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.asComponent
+import dev.munky.roguelike.server.enemy.Enemy
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.Dungeon
 import dev.munky.roguelike.server.instance.dungeon.ModifierSelectRenderer
@@ -13,6 +14,7 @@ import dev.munky.roguelike.server.item.RogueItem
 import dev.munky.roguelike.server.player.RoguePlayer
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import net.minestom.server.MinecraftServer
 import net.minestom.server.command.builder.arguments.ArgumentType
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.EntityCreature
@@ -29,10 +31,11 @@ fun helpCommand() = command("help") {
 fun spawnRandoms() = command("spawnrandoms") {
     playerExecutor{ s, _ ->
         val origin = s.position
+        val data = Roguelike.server().enemies().toList().random()
         repeat(10) {
             val x = origin.x + (Random.nextDouble() * 10 - 5).toInt()
             val z = origin.z + (Random.nextDouble() * 10 - 5).toInt()
-            val e = EntityCreature(EntityType.ZOMBIE)
+            val e = Enemy(data)
             e.setInstance(s.instance, Pos(x, origin.y, z))
         }
     }
@@ -51,6 +54,13 @@ fun testModifierSelect() = command("testModifierSelect") {
                 .with(ModifierSelectRenderer.Radius, 2.0)
                 .dispatchManaged()
         }
+    }
+}
+
+fun stopCommand() = command("stop") {
+    executor { s, _ ->
+        MinecraftServer.LOGGER.info("Stopping server.")
+        Runtime.getRuntime().exit(0)
     }
 }
 

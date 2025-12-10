@@ -107,9 +107,14 @@ object ModifierSelectRenderer : Renderer {
 
         override fun spawn() {
             addViewer(player)
+            itemDisplay.setInstance(instance, position)
             itemDisplay.addViewer(player)
 
             addPassenger(itemDisplay)
+        }
+
+        override fun despawn() {
+            itemDisplay.remove()
         }
 
         override fun onInteract(player: RoguePlayer) {

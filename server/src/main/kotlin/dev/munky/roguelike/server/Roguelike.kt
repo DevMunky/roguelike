@@ -2,6 +2,7 @@ package dev.munky.roguelike.server
 
 import dev.munky.modelrenderer.ModelPlatform
 import dev.munky.roguelike.server.command.*
+import dev.munky.roguelike.server.enemy.EnemyData
 import dev.munky.roguelike.server.instance.InstanceManager
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
@@ -33,7 +34,10 @@ import java.io.InputStream
 import java.util.*
 import javax.imageio.ImageIO
 import kotlin.io.path.Path
-import kotlin.random.Random
+import kotlin.io.path.extension
+import kotlin.io.path.name
+import kotlin.io.path.nameWithoutExtension
+import kotlin.io.path.pathString
 
 
 class Roguelike private constructor() {
@@ -52,7 +56,7 @@ class Roguelike private constructor() {
     private val instanceManager = InstanceManager()
     fun instanceManager() = instanceManager
 
-    private val accountStore = DynamicResourceStoreImpl(
+    private val accountStore = DynamicResourceStore(
         AccountData.serializer(),
         Json {
             prettyPrint = true
@@ -60,11 +64,12 @@ class Roguelike private constructor() {
             encodeDefaults = true
         },
         Path("account/"),
-        key = { uuid.toString() }
+        key = { uuid.toString() },
+        path = { Path("$uuid.json") }
     )
-    fun accounts() : DynamicResourceStore<AccountData> = accountStore
+    fun accounts() : IDynamicResourceStore<AccountData> = accountStore
 
-    private val modifierStore = DynamicResourceStoreImpl(
+    private val modifierStore = ResourceStore(
         ModifierData.serializer(),
         Json {
             prettyPrint = true
@@ -73,13 +78,12 @@ class Roguelike private constructor() {
         Path("modifier/"),
         key = { id }
     )
-
     /**
      * Contains all default Modifiers.
      */
-    fun modifiers() : DynamicResourceStore<ModifierData> = modifierStore
+    fun modifiers() : IResourceStore<ModifierData> = modifierStore
 
-    private val roomSetStore = TransformingResourceStoreImpl(
+    private val roomSetStore = MappedResourceStore(
         RoomSetData.serializer(),
         Json {
             prettyPrint = true
@@ -88,9 +92,9 @@ class Roguelike private constructor() {
         Path("roomset/"),
         transform = { id to RoomSet.create(this) }
     )
-    fun roomSets() : ResourceStore<RoomSet> = roomSetStore
+    fun roomSets() : IResourceStore<RoomSet> = roomSetStore
 
-    private val structureStore = ResourceStoreImpl(
+    private val structureStore = ResourceStore(
         StructureSerializer,
         Nbt {
             variant = NbtVariant.Java
@@ -98,9 +102,20 @@ class Roguelike private constructor() {
             compression = NbtCompression.Gzip
         },
         directory = Path("structure/"),
-        key = { it }
+        key = { it.pathString.replace("\\", "/").removeSuffix("." + it.extension) }
     )
-    fun structures() : ResourceStore<Structure> = structureStore
+    fun structures() : IResourceStore<Structure> = structureStore
+
+    private val enemyDataStore = ResourceStore(
+        EnemyData.serializer(),
+        Json {
+            prettyPrint = true
+            namingStrategy = JsonNamingStrategy.SnakeCase
+        },
+        directory = Path("enemy/"),
+        key = { id }
+    )
+    fun enemies() : IResourceStore<EnemyData> = enemyDataStore
 
     fun renderDistance(r: Int) {
         requireNotTooLate()
@@ -158,7 +173,13 @@ class Roguelike private constructor() {
             modifiers().load()
             structures().load()
             roomSets().load()
+            enemies().load()
         }
+        Runtime.getRuntime().addShutdownHook(Thread {
+            runBlocking {
+                accounts().save()
+            }
+        })
     }
 
     fun minecraftInit() {
@@ -207,7 +228,10 @@ class Roguelike private constructor() {
         MinecraftServer.getCommandManager().unknownCommandCallback = { s, c ->
             s.sendMessage("Unknown command '$c'.".asComponent())
         }
+        MinecraftServer.getCommandManager().register(stopCommand())
         MinecraftServer.getCommandManager().register(helpCommand())
+
+        // debug
         MinecraftServer.getCommandManager().register(spawnRandoms())
         MinecraftServer.getCommandManager().register(testDungeon())
         MinecraftServer.getCommandManager().register(testModifierSelect())

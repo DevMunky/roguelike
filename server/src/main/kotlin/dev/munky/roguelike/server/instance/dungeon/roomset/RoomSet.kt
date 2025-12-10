@@ -73,9 +73,7 @@ data class RoomBlueprint(
         try {
             structure = Roguelike.server().structures()[id] ?: error("No structure named '$id' found.")
         } catch (t: Throwable) {
-            System.err.println("Failed to load structure for room '$id'.")
-            t.printStackTrace()
-            //throw RuntimeException("Failed to load structure for room '$id'.", t)
+            throw RuntimeException("Failed to load structure for room '$id'.", t)
         }
     }
 

@@ -1,0 +1,8 @@
+{
+  "id": "test",
+  "visual": {
+    "type": "vanilla",
+    "entity_type": "minecraft:zombie"
+  },
+  "movement": "WALKING"
+}
