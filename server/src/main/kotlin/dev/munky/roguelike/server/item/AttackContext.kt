@@ -24,25 +24,27 @@ class AttackContext(
 sealed interface AttackCommand {
     fun execute(instance: RogueInstance, player: RoguePlayer)
 
-    fun spawnParticlesAround(instance: RogueInstance, entity: LivingEntity, particle: Particle, amount: Int, speed: Float = 0f) {
-        val xz = entity.boundingBox.width() * 1.05
-        val y = entity.boundingBox.height() * 1.05
-        val particles = ArrayList<ParticlePacket>()
-        repeat(amount) {
-            particles += ParticlePacket(particle, entity.position, Vec(xz, y, xz), speed, 1)
-        }
-        for (player in instance.players) {
-            player.sendPackets(particles as List<ParticlePacket>)
-        }
-    }
-
     data class Ignite(val target: LivingEntity, val damage: Float) : AttackCommand {
         override fun execute(instance: RogueInstance, player: RoguePlayer) = when (target.entityType) {
             EntityType.ITEM_DISPLAY, EntityType.TEXT_DISPLAY,
             EntityType.BLOCK_DISPLAY, EntityType.INTERACTION -> {}
             else -> {
                 target.damage(Damage(DamageType.ON_FIRE, player, null, null, damage))
-                spawnParticlesAround(instance, target, Particle.FLAME, 20)
+                spawnParticlesAround(instance, target, Particle.FLAME, 10)
+            }
+        }
+    }
+
+    companion object {
+        fun spawnParticlesAround(instance: RogueInstance, entity: LivingEntity, particle: Particle, amount: Int, speed: Float = 0f) {
+            val xz = entity.boundingBox.width() * 1.05
+            val y = entity.boundingBox.height() * 1.05
+            val particles = ArrayList<ParticlePacket>()
+            repeat(amount) {
+                particles += ParticlePacket(particle, entity.position, Vec(xz, y, xz), speed, 1)
+            }
+            for (player in instance.players) {
+                player.sendPackets(particles as List<ParticlePacket>)
             }
         }
     }

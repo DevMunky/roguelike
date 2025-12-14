@@ -7,9 +7,9 @@
     }
   },
   "rooms": {
-    "test/end_cap": {},
-    "test/room": {},
-    "test/terrain": {},
-    "test/root": {}
+    "test/end_cap": { "type": "normal" },
+    "test/room": { "type": "normal" },
+    "test/terrain": { "type": "normal" },
+    "test/root": { "type": "normal" }
   }
 }

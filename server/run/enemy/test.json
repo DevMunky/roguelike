@@ -4,5 +4,10 @@
     "type": "vanilla",
     "entity_type": "minecraft:zombie"
   },
-  "movement": "WALKING"
+  "movement": "WALKING",
+  "behaviors": [
+    { "type": "chase_target" },
+    { "type": "melee_attack_target" },
+    { "type": "find_target" }
+  ]
 }

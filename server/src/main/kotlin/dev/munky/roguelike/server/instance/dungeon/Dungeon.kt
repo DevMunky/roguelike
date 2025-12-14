@@ -6,8 +6,8 @@ import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
 import dev.munky.roguelike.common.renderdispatcherapi.RenderHandleManager
 import dev.munky.roguelike.server.instance.RogueInstance
-import dev.munky.roguelike.server.instance.dungeon.roomset.JigsawConnection
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomBlueprint
+import dev.munky.roguelike.server.instance.dungeon.roomset.JigsawConnection
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
 import dev.munky.roguelike.server.instance.town.TownInstance.Companion.TOWN_DIMENSION_KEY
 import dev.munky.roguelike.server.interact.InteractableRegion

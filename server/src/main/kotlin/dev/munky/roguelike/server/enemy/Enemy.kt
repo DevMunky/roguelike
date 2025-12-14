@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import net.minestom.server.entity.EntityCreature
 import net.minestom.server.entity.EntityPose
 import net.minestom.server.entity.LivingEntity
+import net.minestom.server.entity.attribute.Attribute
 import net.minestom.server.entity.damage.Damage
 
 /**
@@ -23,9 +24,11 @@ class Enemy(val data: EnemyData) : EntityCreature(data.visual.entityType) {
         navigator.setNodeGenerator(data.movement.generator)
         navigator.setNodeFollower { data.movement.follower(this@Enemy) }
 
-        ai.addBehavior(FindTarget)
-        ai.addBehavior(ChaseTarget)
-        ai.addBehavior(MeleeAttackTarget)
+        for (behavior in data.behaviors) {
+            ai.addBehavior(behavior)
+        }
+
+        getAttribute(Attribute.MOVEMENT_SPEED).baseValue = 0.125
     }
 
     override fun spawn() {

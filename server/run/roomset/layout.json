@@ -16,16 +16,16 @@
     }
   },
   "rooms": {
-    "layout/root": {},
+    "layout/root": { "type": "normal" },
 
-    "layout/hallway/door": {},
-    "layout/hallway/junction": {},
-    "layout/hallway/left": {},
-    "layout/hallway/right": {},
-    "layout/hallway/straight": {},
+    "layout/hallway/door": { "type": "normal" },
+    "layout/hallway/junction": { "type": "normal" },
+    "layout/hallway/left": { "type": "normal" },
+    "layout/hallway/right": { "type": "normal" },
+    "layout/hallway/straight": { "type": "normal" },
 
-    "layout/rooms/big": {},
-    "layout/rooms/small_loot": {},
-    "layout/rooms/drop": {}
+    "layout/rooms/big": { "type": "normal" },
+    "layout/rooms/small_loot": { "type": "normal" },
+    "layout/rooms/drop": { "type": "normal" }
   }
 }

@@ -1,6 +1,7 @@
 package dev.munky.roguelike.server.enemy
 
 import dev.munky.roguelike.server.EntityTypeSerializer
+import dev.munky.roguelike.server.enemy.ai.behavior.AiBehavior
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -19,7 +20,7 @@ data class EnemyData(
     val id: String,
     val visual: EntityVisualType,
     val movement: EnemyMovementType,
-    // val behaviors: List<AiBehavior>
+    val behaviors: List<AiBehavior>
 )
 
 enum class EnemyMovementType(val follower: (Entity)->NodeFollower, val generator: ()->NodeGenerator) {

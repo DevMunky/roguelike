@@ -3,11 +3,13 @@ package dev.munky.roguelike.server.enemy.ai.behavior
 import dev.munky.roguelike.server.enemy.ai.Ai
 import dev.munky.roguelike.server.player.RoguePlayer
 import kotlinx.coroutines.delay
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import net.minestom.server.entity.LivingEntity
 import net.minestom.server.entity.pathfinding.NavigableEntity
 
 @Serializable
+@SerialName("find_target")
 object FindTarget : AiBehavior {
     override fun <T> priority(context: Ai.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity = when {
         Ai.Context.Key.TARGET in context -> 0.0

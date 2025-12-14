@@ -39,7 +39,7 @@ fun testEnemy() = command("testEnemy") {
         val data = Roguelike.server().enemies().toList().random()
         val radius = 20
         val halfRadius = radius / 2
-        repeat(1) {
+        repeat(5) {
             val x = origin.x + (Random.nextDouble() * radius - halfRadius).toInt()
             val z = origin.z + (Random.nextDouble() * radius - halfRadius).toInt()
             val e = Enemy(data)

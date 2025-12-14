@@ -53,6 +53,7 @@ data class Ai<T>(
         }
 
         if (behavior == null) {
+            LOGGER.debug("No behavior, idling.")
             stopActiveBehavior()
             return
         }
@@ -64,6 +65,8 @@ data class Ai<T>(
     }
 
     fun <T : Any> interrupt(key: Context.Key<T>, value: T) {
+        if (context[key] == value) return
+        LOGGER.debug("Interrupt '{}' is now {}", key, value)
         stopActiveBehavior()
         context[key] = value
     }
@@ -75,13 +78,12 @@ data class Ai<T>(
     }
 
     private fun switchBehavior(newBehavior: AiBehavior) {
-        activeJob?.cancel("Switching to new behavior ${newBehavior::class.simpleName}.")
+        activeJob?.cancel("Switch to new behavior '${newBehavior::class.simpleName}'.")
         activeBehavior = newBehavior
-
-        LOGGER.debug("Switching to behavior '${newBehavior::class.simpleName}'")
 
         activeJob = coroutineScope.launch {
             try {
+                LOGGER.debug("Switch to new behavior '${newBehavior::class.simpleName}'")
                 newBehavior.start(context, entity)
             } catch (e: CancellationException) {
                 // Handled natively: The behavior was interrupted.
