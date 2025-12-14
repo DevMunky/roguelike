@@ -17,8 +17,6 @@ import kotlinx.coroutines.Dispatchers
 import net.minestom.server.MinecraftServer
 import net.minestom.server.command.builder.arguments.ArgumentType
 import net.minestom.server.coordinate.Pos
-import net.minestom.server.entity.EntityCreature
-import net.minestom.server.entity.EntityType
 import kotlin.math.PI
 import kotlin.random.Random
 
@@ -28,13 +26,22 @@ fun helpCommand() = command("help") {
     }
 }
 
-fun spawnRandoms() = command("spawnrandoms") {
+fun toggleDebug() = command("debug") {
+    playerExecutor { s, _ ->
+        val player = s as? RoguePlayer ?: return@playerExecutor
+        player.isDebug = !player.isDebug
+    }
+}
+
+fun testEnemy() = command("testEnemy") {
     playerExecutor{ s, _ ->
         val origin = s.position
         val data = Roguelike.server().enemies().toList().random()
-        repeat(10) {
-            val x = origin.x + (Random.nextDouble() * 10 - 5).toInt()
-            val z = origin.z + (Random.nextDouble() * 10 - 5).toInt()
+        val radius = 20
+        val halfRadius = radius / 2
+        repeat(1) {
+            val x = origin.x + (Random.nextDouble() * radius - halfRadius).toInt()
+            val z = origin.z + (Random.nextDouble() * radius - halfRadius).toInt()
             val e = Enemy(data)
             e.setInstance(s.instance, Pos(x, origin.y, z))
         }

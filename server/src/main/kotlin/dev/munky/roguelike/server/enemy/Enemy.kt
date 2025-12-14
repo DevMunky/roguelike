@@ -1,28 +1,45 @@
 package dev.munky.roguelike.server.enemy
 
-import dev.munky.roguelike.server.player.RoguePlayer
-import net.minestom.server.coordinate.Pos
+import dev.munky.roguelike.server.enemy.ai.Ai
+import dev.munky.roguelike.server.enemy.ai.behavior.ChaseTarget
+import dev.munky.roguelike.server.enemy.ai.behavior.FindTarget
+import dev.munky.roguelike.server.enemy.ai.behavior.MeleeAttackTarget
+import dev.munky.roguelike.server.instance.RogueInstance
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import net.minestom.server.entity.EntityCreature
-import net.minestom.server.entity.EntityType
-import net.minestom.server.entity.ai.EntityAIGroupBuilder
-import net.minestom.server.entity.ai.goal.MeleeAttackGoal
-import net.minestom.server.entity.ai.target.ClosestEntityTarget
-import net.minestom.server.entity.attribute.Attribute
-import net.minestom.server.entity.attribute.AttributeInstance
+import net.minestom.server.entity.EntityPose
+import net.minestom.server.entity.LivingEntity
 import net.minestom.server.entity.damage.Damage
-import java.time.Duration
 
 /**
  * Players don't interact with enemies, enemies kill them.
  */
 class Enemy(val data: EnemyData) : EntityCreature(data.visual.entityType) {
+    val ai = Ai(this, CoroutineScope(Dispatchers.Default + SupervisorJob()))
+
     init {
         navigator.setNodeGenerator(data.movement.generator)
         navigator.setNodeFollower { data.movement.follower(this@Enemy) }
 
-        addAIGroup(EntityAIGroupBuilder()
-            .addGoalSelector(MeleeAttackGoal(this, 1.0, Duration.ofMillis(500)))
-            .addTargetSelector(ClosestEntityTarget(this, 30.0) { target is RoguePlayer })
-            .build())
+        ai.addBehavior(FindTarget)
+        ai.addBehavior(ChaseTarget)
+        ai.addBehavior(MeleeAttackTarget)
     }
+
+    override fun spawn() {
+        ai.start(instance as RogueInstance)
+    }
+
+    override fun despawn() {
+        ai.stop()
+    }
+
+    override fun damage(damage: Damage): Boolean {
+       (damage.source as? LivingEntity)?.let { ai.interrupt(Ai.Context.Key.TARGET, it) }
+        return super.damage(damage)
+    }
+
+    override fun aiTick(time: Long) {}
 }

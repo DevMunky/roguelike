@@ -29,7 +29,7 @@ open class DynamicResourceStore<T : Any>(
         for ((key, e) in entries) decodeContext.launch {
             try {
                 val file = decodedFiles[key] ?: run {
-                    LOGGER.warn("")
+                    LOGGER.warn("Entry '$key' has no associated file, cannot save.")
                     return@launch
                 }
                 val data = when (format) {
@@ -50,5 +50,6 @@ open class DynamicResourceStore<T : Any>(
 
     companion object {
         private val LOGGER = logger {}
+        // TODO autosave task
     }
 }

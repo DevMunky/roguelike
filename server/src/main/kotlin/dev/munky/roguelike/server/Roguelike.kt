@@ -35,8 +35,6 @@ import java.util.*
 import javax.imageio.ImageIO
 import kotlin.io.path.Path
 import kotlin.io.path.extension
-import kotlin.io.path.name
-import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.pathString
 
 
@@ -230,9 +228,10 @@ class Roguelike private constructor() {
         }
         MinecraftServer.getCommandManager().register(stopCommand())
         MinecraftServer.getCommandManager().register(helpCommand())
+        MinecraftServer.getCommandManager().register(toggleDebug())
 
         // debug
-        MinecraftServer.getCommandManager().register(spawnRandoms())
+        MinecraftServer.getCommandManager().register(testEnemy())
         MinecraftServer.getCommandManager().register(testDungeon())
         MinecraftServer.getCommandManager().register(testModifierSelect())
         MinecraftServer.getCommandManager().register(testDropItem())

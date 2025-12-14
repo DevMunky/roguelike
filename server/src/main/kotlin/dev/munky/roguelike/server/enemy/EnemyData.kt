@@ -18,7 +18,8 @@ import net.minestom.server.entity.pathfinding.generators.NodeGenerator
 data class EnemyData(
     val id: String,
     val visual: EntityVisualType,
-    val movement: EnemyMovementType
+    val movement: EnemyMovementType,
+    // val behaviors: List<AiBehavior>
 )
 
 enum class EnemyMovementType(val follower: (Entity)->NodeFollower, val generator: ()->NodeGenerator) {
