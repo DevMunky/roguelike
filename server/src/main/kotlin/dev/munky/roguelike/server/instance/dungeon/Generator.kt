@@ -7,7 +7,9 @@ import dev.munky.roguelike.server.interact.Region
 import net.hollowcube.schem.util.Rotation
 import net.minestom.server.coordinate.BlockVec
 import dev.munky.roguelike.common.WeightedRandomList
+import dev.munky.roguelike.server.instance.dungeon.roomset.Pool
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomBlueprint
+import kotlinx.coroutines.Deferred
 import java.util.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -15,7 +17,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import java.util.LinkedList
 import java.util.TreeMap
+import kotlin.math.E
 import kotlin.math.max
+import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -29,6 +33,8 @@ interface Generator {
             DEPTH_EXCEEDED,
             NO_VALID_CONNECTION,
             NO_POOL,
+            EMPTY_POOL,
+            TOO_SMALL,
         }
     }
 }
@@ -126,12 +132,20 @@ class BackTrackingGenerator(
 
         var tries = 20
         while (tries-- > 0) {
-            when (val r = generate(root, maxDepth)) {
+            when (val r = generate(root, 0)) {
                 is Generator.Result.Success -> {
                     stats.timeTaken = TimeSource.Monotonic.markNow().minus(start)
                     return r
                 }
-                else -> LOGGER.warn("Could not generate connection at root, $tries left.")
+                is Generator.Result.Failure -> {
+                    // reset existing connections, in case it generated an impossible situation.
+                    for (c in root.connections.keys) {
+                        root.connections[c] = null
+                    }
+                    spatialBin.clear()
+                    stats.roomsPlanned = 0
+                    LOGGER.warn("Could not generate connection at root (${r.name}), $tries left.")
+                }
             }
         }
         stats.timeTaken = TimeSource.Monotonic.markNow().minus(start)
@@ -143,22 +157,42 @@ class BackTrackingGenerator(
      */
     private suspend fun generate(room: PlannedRoom, depth: Int): Generator.Result {
         // We must satisfy ALL open connections of this room (and their descendants)
-        if (depth < 0) {
+        if (depth >= maxDepth) {
             logDebug { "generate(): exceeded depth; room='${room.blueprint.id}' pos=${room.position}" }
             return Generator.Result.Failure.DEPTH_EXCEEDED
         }
 
+        // All connections satisfied, this room is complete.
         if (null !in room.connections.values) {
-            return Generator.Result.Success(room)
+            if (room.connections.values.size > 1) return Generator.Result.Success(room)
+            val heuristic = depthHeuristic(depth)
+            val chance = random.nextDouble()
+            // Dungeon too small, try another room.
+            return if (heuristic > chance) Generator.Result.Failure.TOO_SMALL
+            else Generator.Result.Success(room)
         }
 
         val conn = pickNextConnector(room)
-        val pool = roomset.pools[conn.pool]?.takeIf { !it.isEmpty() } ?: run {
+        val pool = conn.pool ?: run {
             logDebug { "generate(): NO_POOL for pool='${conn.pool}'" }
             return Generator.Result.Failure.NO_POOL
         }
 
+        if (pool.rooms.isEmpty()) {
+            logDebug { "generate(): EMPTY_POOL for pool='${conn.pool}'" }
+            return Generator.Result.Failure.EMPTY_POOL
+        }
+
         return satisfyConnection(room, depth, conn, pool)
+    }
+
+    private fun depthHeuristic(depth: Int) : Double {
+        val t = 10.0
+        val ramp = 1 - (depth / maxDepth.toDouble())
+        val num = 1 - E.pow(t * ramp)
+        val den = 1 - E.pow(t)
+        val allowable = 0.9
+        return (num / den) * allowable
     }
 
     /**
@@ -168,7 +202,7 @@ class BackTrackingGenerator(
         room: PlannedRoom,
         depth: Int,
         conn: JigsawConnection,
-        pool: WeightedRandomList<String>
+        pool: Pool
     ): Generator.Result {
         // Build a read-only snapshot of the spatial plan for worker threads
         val snapshot = buildMap(spatialBin.size) {
@@ -177,7 +211,7 @@ class BackTrackingGenerator(
         stats.spatialBinCopies++
         stats.spatialBinAverageCopySize = (snapshot.size + stats.spatialBinCopies * stats.spatialBinAverageCopySize) / (stats.spatialBinCopies.toDouble() + 1)
 
-        val candidates = computeCandidates(room, conn, pool, snapshot)
+        val candidates = computeCandidates(room, conn, pool, pool.rooms, snapshot)
         if (candidates.isEmpty()) {
             logDebug { "satisfyConnection(): NO_VALID_CONNECTION - no candidates fit geometry" }
             return Generator.Result.Failure.NO_VALID_CONNECTION
@@ -200,7 +234,7 @@ class BackTrackingGenerator(
 
             logDebug { "satisfyConnection(): descending into ${candidate.blueprint.id}." }
 
-            val branchResult = when (val r = generate(candidate, depth - 1)) {
+            val branchResult = when (val r = generate(candidate, depth + 1)) {
                 is Generator.Result.Success -> generate(room, depth)
                 else -> r
             }
@@ -209,12 +243,15 @@ class BackTrackingGenerator(
                 return Generator.Result.Success(room)
             }
 
-            logDebug { "satisfyConnection(): back tracking ${candidate.blueprint.id}." }
+            logDebug { "satisfyConnection(): back tracking ${candidate.blueprint.id} (${branchResult})." }
             stats.roomsPlanned--
             stats.ascends++
             unindex(candidateData.chunks, candidate)
             room.connections[conn] = null
             candidate.connections[candidateData.matchedConn] = null
+            if (branchResult == Generator.Result.Failure.DEPTH_EXCEEDED){
+                break
+            }
         }
 
         logDebug { "satisfyConnection(): All candidates exhausted for this connection." }
@@ -224,9 +261,8 @@ class BackTrackingGenerator(
     private fun pickNextConnector(room: PlannedRoom): JigsawConnection {
         val open = room.connections.keys.filter { room.connections[it] == null }
         return open.minBy { conn ->
-            val pool = roomset.pools[conn.pool]
             // smaller pool → more constrained → try first
-            pool?.size ?: Int.MAX_VALUE
+            conn.pool?.rooms?.size ?: Int.MAX_VALUE
         }
     }
 
@@ -292,31 +328,37 @@ class BackTrackingGenerator(
     // Owner spawns workers on Default dispatcher to evaluate candidates against snapshot
     private suspend fun computeCandidates(
         owner: PlannedRoom,
-        conn: JigsawConnection,
-        pool: WeightedRandomList<String>,
+        hostConnection: JigsawConnection,
+        pool: Pool,
+        rooms: WeightedRandomList<String>,
         snapshot: Map<Long, LinkedList<PlannedRoom>>
     ): List<CandidateResult> = coroutineScope {
-
-        val maxRooms = pool.size
+        val tasks = ArrayList<Deferred<CandidateResult?>>()
+        val maxRooms = rooms.size
         val sampled = LinkedHashSet<String>(maxRooms)
+        val inverted = hostConnection.direction.opposite()
+
         // Currently samples every room in the pool to evaluate at the same time
         while (sampled.size < maxRooms) {
-            sampled += pool.weightedRandom(random)
+            sampled += rooms.weightedRandom(random)
         }
-        val tasks = ArrayList<kotlinx.coroutines.Deferred<CandidateResult?>>()
-        val inverted = conn.direction.opposite()
+
         for (roomId in sampled) {
             val bp = roomset.rooms[roomId] ?: continue
-            for (rot in Rotation.entries) {
+            for (rot in Rotation.entries.shuffled(random)) {
                 val candidateConnections = bp.connectionsWith(rot)
-                var matchedPool = false
-                for (c in candidateConnections) {
-                    if (c.pool != conn.pool) continue
-                    matchedPool = true
-                    if (c.direction != inverted) continue
+                var hasReciprocalConnection = false
+                for (childConnection in candidateConnections) {
+                    val childPool = childConnection.pool ?: break
+                    if (pool.id !in childPool.connectedPools && childPool.id !in pool.connectedPools) {
+                        LOGGER.debug("{} !in ({}) {} && {} !in ({}) {}", pool.id, childPool.id, childPool.connectedPools, childPool.id, pool.id, pool.connectedPools)
+                        continue
+                    }
+                    hasReciprocalConnection = true
+                    if (childConnection.direction != inverted) continue
                     tasks += async(Dispatchers.Default) {
                         stats.candidatesTried++
-                        val candidatePos = computeCandidatePosition(owner, conn, c)
+                        val candidatePos = computeCandidatePosition(owner, hostConnection, childConnection)
                         val candidateRegion = bp.regionAt(candidatePos, rot)
                         val candidateBounds = candidateRegion.expand(-0.1)
                         val candidateChunks = candidateBounds.containedChunks()
@@ -326,18 +368,22 @@ class BackTrackingGenerator(
                             return@async null
                         }
                         if (isIntersectingSnapshot(candidateChunks, candidateBounds, snapshot)) return@async null
+
                         CandidateResult(
                             bp = bp,
                             rot = rot,
                             pos = candidatePos,
                             region = candidateRegion,
                             connections = candidateConnections,
-                            matchedConn = c,
+                            matchedConn = childConnection,
                             chunks = candidateChunks
                         )
                     }
                 }
-                if (!matchedPool) LOGGER.warn("room '$roomId' had no connections in pool '${conn.pool}', yet is inside of that pool.")
+                if (!hasReciprocalConnection) {
+                    LOGGER.warn("No connections in room '$roomId' were in pool '${pool.id}', yet '$roomId' is defined in pool '${pool.id}'.")
+                    break
+                }
             }
         }
 

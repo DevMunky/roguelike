@@ -62,12 +62,14 @@ class Dungeon private constructor(
 
     private suspend fun initialize() {
         // place root room at origin
-        val generator = BackTrackingGenerator(roomset, maxDepth = 50, seed = System.nanoTime(), debug = false)
+        val generator = BackTrackingGenerator(roomset, maxDepth = 50, seed = System.nanoTime(), debug = true)
         try {
             val plan = when (val generation = generator.plan()) {
                 Generator.Result.Failure.NO_POOL -> throw RuntimeException("No pool available..")
+                Generator.Result.Failure.EMPTY_POOL -> throw RuntimeException("A pool is empty.")
                 Generator.Result.Failure.DEPTH_EXCEEDED -> throw RuntimeException("Exceeded max depth.")
                 Generator.Result.Failure.NO_VALID_CONNECTION -> throw RuntimeException("No valid connection found.")
+                Generator.Result.Failure.TOO_SMALL -> throw RuntimeException("Dungeon too small.")
                 is Generator.Result.Success -> generation.room
             }
 

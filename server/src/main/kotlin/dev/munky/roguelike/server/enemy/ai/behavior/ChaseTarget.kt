@@ -12,17 +12,17 @@ import kotlin.math.pow
 @Serializable
 @SerialName("chase_target")
 object ChaseTarget : AiBehavior {
-    override fun <T> priority(context: Ai.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
-        val target = context[Ai.Context.Key.TARGET] ?: return 0.0
+    override fun <T> priority(context: Ai<T>.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
+        val target = context[Ai.ContextKey.TARGET] ?: return 0.0
         val distance = entity.position.distanceSquared(target.position)
         val maxDistance = 20.0.pow(2)
         if (distance >= maxDistance) return 0.0
         return distance / maxDistance
     }
 
-    override suspend fun <T> start(context: Ai.Context, entity: T) where T : LivingEntity, T : NavigableEntity {
-        val target = context[Ai.Context.Key.TARGET] ?: return
-        while (true) {
+    override suspend fun <T> start(context: Ai<T>.Context, entity: T) where T : LivingEntity, T : NavigableEntity {
+        val target = context[Ai.ContextKey.TARGET] ?: return
+        while (!target.isDead) {
             withTimeoutOrNull(10000) {
                 entity.navigator.setPathTo(target.position, 1.5, 60.0, 200.0) {}
             } ?: return

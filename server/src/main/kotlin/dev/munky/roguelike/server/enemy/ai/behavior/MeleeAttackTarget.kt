@@ -14,8 +14,8 @@ import kotlin.math.pow
 @Serializable
 @SerialName("melee_attack_target")
 object MeleeAttackTarget : AiBehavior {
-    override fun <T> priority(context: Ai.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
-        val target = context[Ai.Context.Key.TARGET] ?: return 0.0
+    override fun <T> priority(context: Ai<T>.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
+        val target = context[Ai.ContextKey.TARGET] ?: return 0.0
         val distance = entity.position.distanceSquared(target.position)
         val maxDistance = 2.0.pow(2)
         if (distance >= maxDistance) return 0.0
@@ -23,11 +23,11 @@ object MeleeAttackTarget : AiBehavior {
     }
 
     override suspend fun <T> start(
-        context: Ai.Context,
+        context: Ai<T>.Context,
         entity: T
     ) where T : LivingEntity, T : NavigableEntity {
-        val target = context[Ai.Context.Key.TARGET] ?: return
-        val instance = context[Ai.Context.Key.INSTANCE] ?: return
+        val target = context[Ai.ContextKey.TARGET] ?: return
+        val instance = context[Ai.ContextKey.INSTANCE] ?: return
 
         while (!target.isDead && target.instance == entity.instance) {
             entity.lookAt(target)
@@ -43,6 +43,6 @@ object MeleeAttackTarget : AiBehavior {
             ))
             delay(590) // end lag
         }
-        context.remove(Ai.Context.Key.TARGET)
+        context.remove(Ai.ContextKey.TARGET)
     }
 }

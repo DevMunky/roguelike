@@ -32,19 +32,9 @@ class RoomSet private constructor(val data: RoomSetData) {
     /**
      * Pool id -> WeightedRandomList of room ids.
      */
-    val pools = data.pools.mapValues { (_, v) -> WeightedRandomList(weightMapFrom(v)) }
+    val pools = data.pools.mapValues { (k, v) -> Pool.of(this, k, v) }
 
-    private fun weightMapFrom(pool: PoolData) : Map<String, Double> = when (pool) {
-        is ReferencePoolData -> weightMapFrom(data.pools[pool.id]!!)
-        is RoomPoolData -> pool.rooms
-        is UnionPoolData -> {
-            HashMap<String, Double>().apply {
-                for (innerPool in pool.pools) {
-                    putAll(weightMapFrom(innerPool))
-                }
-            }
-        }
-    }
+
 
     val rootRoomId = "$id/$ROOT_ROOM_ID"
 
@@ -56,13 +46,13 @@ class RoomSet private constructor(val data: RoomSetData) {
     }
 
     private suspend fun createRooms() : Map<String, NormalRoomBlueprint> = coroutineScope {
-        val rooms = LinkedHashMap<String, NormalRoomBlueprint>()
-        for (room in data.rooms) {
-            val room = NormalRoomBlueprint(room.key, this@RoomSet, room.value)
-            rooms[room.id] = room
-            launch { room.initialize() }
+        LinkedHashMap<String, NormalRoomBlueprint>().apply {
+            for (room in data.rooms) {
+                val room = NormalRoomBlueprint(room.key, this@RoomSet, room.value)
+                set(room.id, room)
+                launch { room.initialize() }
+            }
         }
-        rooms
     }
 
     companion object {
@@ -70,6 +60,44 @@ class RoomSet private constructor(val data: RoomSetData) {
 
         suspend fun create(roomSetData: RoomSetData) : RoomSet = RoomSet(roomSetData).apply {
             initialize()
+        }
+    }
+}
+
+data class Pool (
+    val id: String,
+    val rooms: WeightedRandomList<String>,
+    val connectedPools: List<String>
+) {
+    companion object {
+        fun of(roomSet: RoomSet, id: String, data: PoolData) : Pool {
+            val connections = arrayListOf(id)
+            val rooms = HashMap<String, Double>()
+            gatherRooms(roomSet.data.pools, rooms, data)
+            gatherConnections(roomSet.data.pools, connections, data)
+            return Pool(
+                id,
+                WeightedRandomList(rooms),
+                connections
+            )
+        }
+
+        private fun gatherConnections(pools: Map<String, PoolData>, connections: ArrayList<String>, pool: PoolData) {
+            when (pool) {
+                is ReferencePoolData -> gatherConnections(pools, connections, pools[pool.id]!!)
+                is UnionPoolData -> pool.pools.forEach { gatherConnections(pools, connections, it) }
+
+                is RoomPoolData -> connections += pools.entries.first { it.value == pool }.key
+            }
+        }
+
+        private fun gatherRooms(pools: Map<String, PoolData>, rooms: HashMap<String, Double>, pool: PoolData) {
+            when (pool) {
+                is ReferencePoolData -> gatherRooms(pools, rooms, pools[pool.id]!!)
+                is UnionPoolData -> pool.pools.forEach { gatherRooms(pools, rooms, it) }
+
+                is RoomPoolData -> rooms.putAll(pool.rooms)
+            }
         }
     }
 }
@@ -148,7 +176,7 @@ sealed class RoomBlueprint(
 
         return JigsawConnection(
             name = name,
-            pool = pool,
+            pool = parent.pools[pool],
             finalBlock = finalBlock,
             target = target,
             position = offsetFromCenter,
@@ -295,7 +323,7 @@ private class NormalRoomBlueprint(
 
 data class JigsawConnection(
     val name: String,
-    val pool: String,
+    val pool: Pool?,
     val finalBlock: Block,
     val target: String,
 

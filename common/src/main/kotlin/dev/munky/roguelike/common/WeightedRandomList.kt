@@ -19,10 +19,10 @@ class WeightedRandomList<T>() : Collection<T> {
     private var accumulatedWeight = 0.0
 
     override val size: Int get() = elements.size
-    override fun contains(element: T): Boolean = elements.map { it.value }.contains(element)
+    override fun contains(element: T): Boolean = elements.any { it.value == element }
     override fun iterator(): Iterator<T> = elements.map { it.value }.iterator()
     override fun isEmpty(): Boolean = elements.isEmpty()
-    override fun containsAll(elements: Collection<T>): Boolean = this.elements.map { it.value }.containsAll(elements)
+    override fun containsAll(elements: Collection<T>): Boolean = elements.all { contains(it) }
 
     fun put(value: T, weight: Double) {
         accumulatedWeight += weight

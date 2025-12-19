@@ -25,7 +25,7 @@ data class Ai<T>(
 
     fun start(instance: RogueInstance) {
         stopped = false
-        context[Context.Key.INSTANCE] = instance
+        context[ContextKey.INSTANCE] = instance
         coroutineScope.launch {
             while (isActive && !entity.isDead && !stopped) {
                 tick()
@@ -64,15 +64,15 @@ data class Ai<T>(
             switchBehavior(behavior)
     }
 
-    fun <T : Any> interrupt(key: Context.Key<T>, value: T) {
+    fun <T : Any> interrupt(key: ContextKey<T>, value: T?) {
         if (context[key] == value) return
         LOGGER.debug("Interrupt '{}' is now {}", key, value)
         stopActiveBehavior()
-        context[key] = value
+        value?.let { context.set(key, it) } ?: context.remove(key)
     }
 
     private fun stopActiveBehavior() {
-        context.remove(Context.Key.TARGET)
+        context.remove(ContextKey.TARGET)
         activeJob?.cancel("Stopping active behavior.")
         activeBehavior = null
     }
@@ -93,20 +93,41 @@ data class Ai<T>(
     }
 
     @Suppress("UNCHECKED_CAST")
-    class Context {
-        private val data = ConcurrentHashMap<Key<*>, Any>()
+    inner class Context {
+        private val data = ConcurrentHashMap<ContextKey<*>, Any>()
 
-        operator fun <T : Any> get(key: Key<T>) = data[key] as T?
-        operator fun <T : Any> contains(key: Key<T>) = data.containsKey(key)
-        operator fun <T : Any> set(key: Key<T>, value: T) = data.put(key, value)
-        fun <T : Any> remove(key: Key<T>) : T? = data.remove(key) as T?
+        /**
+         * Get the value associated with a key or null if it doesn't exist.
+         */
+        operator fun <T : Any> get(key: ContextKey<T>) = data[key] as T?
 
-        @Suppress("unused")
-        data class Key<T : Any>(val id: String) {
-            companion object {
-                val INSTANCE = Key<RogueInstance>("rogue_instance")
-                val TARGET = Key<LivingEntity>("target")
-            }
+        /**
+         * Check if the context currently contains a value for a key.
+         */
+        operator fun <T : Any> contains(key: ContextKey<T>) = data.containsKey(key)
+
+        /**
+         * Sets a value in the context without interrupting.
+         */
+        operator fun <T : Any> set(key: ContextKey<T>, value: T) = data.put(key, value)
+
+        /**
+         * Removes a value from the context without interrupting.
+         */
+        fun <T : Any> remove(key: ContextKey<T>) : T? = data.remove(key) as T?
+
+        /**
+         * Interrupt the Ai associated with this context.
+         */
+        fun <T : Any> interrupt(key: ContextKey<T>, value: T?) = this@Ai.interrupt(key, value)
+    }
+
+    @Suppress("unused")
+    @JvmInline
+    value class ContextKey<T : Any> private constructor (private val id: String) {
+        companion object {
+            val INSTANCE = ContextKey<RogueInstance>("rogue_instance")
+            val TARGET = ContextKey<LivingEntity>("target")
         }
     }
 

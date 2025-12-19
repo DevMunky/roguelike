@@ -8,6 +8,7 @@ import dev.munky.roguelike.server.instance.RogueInstance
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityCreature
 import net.minestom.server.entity.EntityPose
 import net.minestom.server.entity.LivingEntity
@@ -40,7 +41,7 @@ class Enemy(val data: EnemyData) : EntityCreature(data.visual.entityType) {
     }
 
     override fun damage(damage: Damage): Boolean {
-       (damage.source as? LivingEntity)?.let { ai.interrupt(Ai.Context.Key.TARGET, it) }
+       (damage.source as? LivingEntity)?.let { ai.interrupt(Ai.ContextKey.TARGET, it) }
         return super.damage(damage)
     }
 
