@@ -345,7 +345,7 @@ class BackTrackingGenerator(
 
         for (roomId in sampled) {
             val bp = roomset.rooms[roomId] ?: continue
-            for (rot in Rotation.entries.shuffled(random)) {
+            for (rot in Rotation.entries/*.shuffled(random)*/) {
                 val candidateConnections = bp.connectionsWith(rot)
                 var hasReciprocalConnection = false
                 for (childConnection in candidateConnections) {
