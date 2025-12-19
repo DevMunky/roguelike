@@ -1,20 +1,6 @@
 {
   "id": "layout",
   "dimension_key": "minecraft:overworld",
-  "pools": {
-    "roguelike:hallways": {
-      "layout/hallway/door": 1,
-      "layout/hallway/junction": 0.1,
-      "layout/hallway/left": 1,
-      "layout/hallway/right": 1,
-      "layout/hallway/straight": 1
-    },
-    "roguelike:rooms": {
-      "layout/rooms/big": 2,
-      "layout/rooms/small_loot": 0.8,
-      "layout/rooms/drop": 1
-    }
-  },
   "rooms": {
     "layout/root": { "type": "normal" },
 
@@ -24,8 +10,41 @@
     "layout/hallway/right": { "type": "normal" },
     "layout/hallway/straight": { "type": "normal" },
 
-    "layout/rooms/big": { "type": "normal" },
-    "layout/rooms/small_loot": { "type": "normal" },
-    "layout/rooms/drop": { "type": "normal" }
+    "layout/room/big": { "type": "normal" },
+    "layout/room/small_loot": { "type": "normal" },
+    "layout/room/drop": { "type": "normal" }
+  },
+  "pools": {
+    "roguelike:room_connections": {
+      "type": "room_pool",
+      "rooms": {
+        "layout/hallway/door": 1,
+        "layout/hallway/junction": 0.1,
+        "layout/hallway/left": 1,
+        "layout/hallway/right": 1,
+        "layout/hallway/straight": 1
+      }
+    },
+    "roguelike:rooms": {
+      "type": "room_pool",
+      "rooms": {
+        "layout/room/big": 2,
+        "layout/room/small_loot": 0.8,
+        "layout/room/drop": 1
+      }
+    },
+    "roguelike:hallways": {
+      "type": "union_pool",
+      "pools": [
+        {
+          "type": "reference",
+          "id": "roguelike:rooms"
+        },
+        {
+          "type": "reference",
+          "id": "roguelike:room_connections"
+        }
+      ]
+    }
   }
 }

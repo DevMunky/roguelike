@@ -45,6 +45,9 @@ interface Region {
      */
     fun intersectsAabb(other: Region): Boolean = this.boundingBox.intersects(other.boundingBox)
 
+    /**
+     * Implementors should override this to cache the chunks this region resides in.
+     */
     fun containedChunks(): LongArray {
         val min = boundingBox.min
         val max = boundingBox.max
@@ -123,6 +126,7 @@ interface Region {
 
     data class Cuboid(val min: Vector3dc, val max: Vector3dc) : Region {
         override val boundingBox: Cuboid = this
+        private var chunkCache: LongArray? = null
 
         override fun expand(amount: Double): Region = copy(
             min = min.sub(amount, amount, amount, Vector3d()),
@@ -134,6 +138,10 @@ interface Region {
             if (p.y() < min.y() || p.y() > max.y()) return false
             if (p.z() < min.z() || p.z() > max.z()) return false
             return true
+        }
+
+        override fun containedChunks(): LongArray {
+            return chunkCache ?: super.containedChunks().also { chunkCache = it }
         }
 
         override fun offset(p: Vector3dc): Region = Cuboid(min.add(p, Vector3d()), max.add(p, Vector3d()))

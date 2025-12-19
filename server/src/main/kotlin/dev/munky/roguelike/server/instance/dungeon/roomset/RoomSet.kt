@@ -32,17 +32,17 @@ class RoomSet private constructor(val data: RoomSetData) {
     /**
      * Pool id -> WeightedRandomList of room ids.
      */
-    val pools = data.pools.mapValues { (_, v) -> WeightedRandomList(randomListOf(v)) }
+    val pools = data.pools.mapValues { (_, v) -> WeightedRandomList(weightMapFrom(v)) }
 
-    private fun randomListOf(pool: PoolData) : Map<String, Double> = when (pool) {
-        is PoolData.RoomPoolData -> pool.rooms
-        is PoolData.UnionPoolData -> {
-            val map = HashMap<String, Double>()
-            val pools = data.pools.filter { it.key in pool.pools }.values
-            for (refPool in pools) {
-                map.putAll(randomListOf(refPool))
+    private fun weightMapFrom(pool: PoolData) : Map<String, Double> = when (pool) {
+        is ReferencePoolData -> weightMapFrom(data.pools[pool.id]!!)
+        is RoomPoolData -> pool.rooms
+        is UnionPoolData -> {
+            HashMap<String, Double>().apply {
+                for (innerPool in pool.pools) {
+                    putAll(weightMapFrom(innerPool))
+                }
             }
-            map
         }
     }
 
@@ -315,12 +315,13 @@ data class RoomSetData(
 ) {
     init {
         for ((id, element) in pools) when (element) {
-            is PoolData.UnionPoolData -> {
-                for (pool in element.pools) if (!pools.containsKey(pool)) {
+            is ReferencePoolData -> error("Must not have a reference pool in Roomset pools.")
+            is UnionPoolData -> {
+                for (pool in element.pools) if (pool is ReferencePoolData && !pools.containsKey(pool.id)) {
                     LOGGER.warn("Pool '$id' of Roomset '${this.id}' references pool '$pool' which does not exist.")
                 }
             }
-            is PoolData.RoomPoolData -> {
+            is RoomPoolData -> {
                 for (room in element.rooms.keys) if (!rooms.containsKey(room)) {
                     LOGGER.warn("Pool '$id' of Roomset '${this.id}' references room '$room' which does not exist.")
                 }
@@ -334,20 +335,25 @@ data class RoomSetData(
 }
 
 @Serializable
-sealed interface PoolData {
+sealed interface PoolData
 
-    @Serializable
-    @SerialName("room_pool")
-    data class RoomPoolData(
-        val rooms: Map<String, Double>
-    ) : PoolData
+@Serializable
+@SerialName("reference")
+data class ReferencePoolData(
+    val id: String
+) : PoolData
 
-    @Serializable
-    @SerialName("union_pool")
-    data class UnionPoolData(
-        val pools: List<String>
-    ) : PoolData
-}
+@Serializable
+@SerialName("room_pool")
+data class RoomPoolData(
+    val rooms: Map<String, Double>
+) : PoolData
+
+@Serializable
+@SerialName("union_pool")
+data class UnionPoolData(
+    val pools: List<PoolData>
+) : PoolData
 
 @Serializable
 sealed interface RoomData

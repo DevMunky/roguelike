@@ -309,8 +309,10 @@ class BackTrackingGenerator(
             val bp = roomset.rooms[roomId] ?: continue
             for (rot in Rotation.entries) {
                 val candidateConnections = bp.connectionsWith(rot)
+                var matchedPool = false
                 for (c in candidateConnections) {
                     if (c.pool != conn.pool) continue
+                    matchedPool = true
                     if (c.direction != inverted) continue
                     tasks += async(Dispatchers.Default) {
                         stats.candidatesTried++
@@ -335,6 +337,7 @@ class BackTrackingGenerator(
                         )
                     }
                 }
+                if (!matchedPool) LOGGER.warn("room '$roomId' had no connections in pool '${conn.pool}', yet is inside of that pool.")
             }
         }
 
