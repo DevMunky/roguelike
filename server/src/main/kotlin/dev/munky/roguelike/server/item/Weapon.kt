@@ -1,9 +1,11 @@
 package dev.munky.roguelike.server.item
 
+import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.item.modifier.ModifierData
 import dev.munky.roguelike.server.player.RoguePlayer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
@@ -23,11 +25,11 @@ data class Weapon(val data: WeaponData) : RogueItem {
         val instance = player.instance as? RogueInstance ?: return
         val ctx = AttackContext(instance, player)
         modifiers.values.sorted().forEach { mod ->
-            repeat(mod.data.count) {
-                mod.attack(ctx)
-            }
+            repeat(mod.data.count) { mod.attack(ctx) }
         }
-        ctx.attack()
+        Dispatchers.Default.launch {
+            ctx.attack()
+        }
     }
 
     override fun buildItemStack(): ItemStack {

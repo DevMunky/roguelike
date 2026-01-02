@@ -14,10 +14,12 @@ import kotlin.math.pow
 @Serializable
 @SerialName("melee_attack_target")
 object MeleeAttackTarget : AiBehavior {
+    const val ATTACK_DISTANCE = 2.0
+
     override fun <T> priority(context: Ai<T>.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
         val target = context[Ai.ContextKey.TARGET] ?: return 0.0
         val distance = entity.position.distanceSquared(target.position)
-        val maxDistance = 2.0.pow(2)
+        val maxDistance = ATTACK_DISTANCE.pow(2)
         if (distance >= maxDistance) return 0.0
         return 1 - (distance / maxDistance)
     }

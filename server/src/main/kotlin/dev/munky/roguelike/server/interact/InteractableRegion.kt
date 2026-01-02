@@ -238,7 +238,7 @@ interface InteractableRegion {
                     delay(100)
                     val instances = MinecraftServer.getInstanceManager().instances
                     coroutineScope {
-                        for (instance in instances) if (instance is InteractableAreaContainer) launch {
+                        for (instance in instances) if (instance is InteractableRegionContainer) launch {
                             synchronized(instance.players) {
                                 for (player in instance.players.filterIsInstance<RoguePlayer>()) {
                                     triggerAreas(instance.areas, player)
@@ -255,7 +255,7 @@ interface InteractableRegion {
                 while (isActive) {
                     delay(50)
                     for (instance in MinecraftServer.getInstanceManager().instances) {
-                        val container = instance as? InteractableAreaContainer ?: continue
+                        val container = instance as? InteractableRegionContainer ?: continue
                         val areas = synchronized(container.areas) {
                             container.areas.toList()
                         }
@@ -354,7 +354,7 @@ data class InteractableRegionImpl(
     override fun onEnter(player: RoguePlayer): Unit = onEnterFun(player)
 }
 
-interface InteractableAreaContainer {
+interface InteractableRegionContainer {
     val areas: HashSet<InteractableRegion>
 
     fun createArea(b: InteractableRegion.Dsl.() -> Unit)

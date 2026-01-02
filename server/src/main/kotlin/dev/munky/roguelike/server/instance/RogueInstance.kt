@@ -7,7 +7,7 @@ import dev.munky.roguelike.common.renderdispatcherapi.RenderHandleManager
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.interact.InteractableRegion
-import dev.munky.roguelike.server.interact.InteractableAreaContainer
+import dev.munky.roguelike.server.interact.InteractableRegionContainer
 import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.event.EventFilter
@@ -23,7 +23,7 @@ import java.util.*
 abstract class RogueInstance(
     uuid: UUID,
     dimensionType: RegistryKey<DimensionType>
-) : InstanceContainer(uuid, dimensionType), InteractableAreaContainer, RenderContext.Element, RenderHandleManager {
+) : InstanceContainer(uuid, dimensionType), InteractableRegionContainer, RenderContext.Element, RenderHandleManager {
     final override val key: RenderContext.Key<*> = Companion
 
     override val areas: HashSet<InteractableRegion> = HashSet()

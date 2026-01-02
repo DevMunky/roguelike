@@ -11,6 +11,8 @@ import net.minestom.server.entity.pathfinding.NavigableEntity
 @Serializable
 @SerialName("find_target")
 object FindTarget : AiBehavior {
+    const val MAX_DISTANCE = 20.0
+
     override fun <T> priority(context: Ai<T>.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity = when {
         Ai.ContextKey.TARGET in context -> 0.0
         Ai.ContextKey.INSTANCE !in context -> 0.0
@@ -21,7 +23,7 @@ object FindTarget : AiBehavior {
         val instance = context[Ai.ContextKey.INSTANCE] ?: return
         var target: LivingEntity? = null
         while (target == null) {
-            target = context[Ai.ContextKey.TARGET] ?: instance.getNearbyEntities(entity.position, 20.0)
+            target = context[Ai.ContextKey.TARGET] ?: instance.getNearbyEntities(entity.position, MAX_DISTANCE)
                 .filterIsInstance<LivingEntity>()
                 .filter { it != entity && !it.isDead && if (it is RoguePlayer) !it.isDebug else true}
                 .minByOrNull { it.position.distanceSquared(entity.position) }

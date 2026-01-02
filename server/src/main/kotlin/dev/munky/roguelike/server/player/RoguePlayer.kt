@@ -1,7 +1,10 @@
 package dev.munky.roguelike.server.player
 
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
+import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.server.Roguelike
+import dev.munky.roguelike.server.death.DeathRenderer
+import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.interact.HoverableInteractableCreature
 import dev.munky.roguelike.server.interact.InteractableRegion
 import dev.munky.roguelike.server.interact.Region
@@ -51,6 +54,24 @@ class RoguePlayer(connection: PlayerConnection, profile: GameProfile) : Player(c
     override fun spawn() {
         areasInside.clear()
         refreshLoadout()
+    }
+
+    override fun kill() {
+        val instance = instance
+        if (instance == null || instance !is RogueInstance) {
+            super.kill()
+            return
+        }
+        if (!isDead) {
+            with(instance) {
+                RenderDispatch.with(DeathRenderer)
+                    .with(this)
+                    .with(instance)
+                    .dispatchManaged()
+            }
+        }
+        isDead = true // so the super player class doesnt send the death screen.
+        super.kill()
     }
 
     companion object : RenderContext.Key<RoguePlayer> {

@@ -18,7 +18,7 @@ import net.minestom.server.entity.damage.Damage
 /**
  * Players don't interact with enemies, enemies kill them.
  */
-class Enemy(val data: EnemyData) : EntityCreature(data.visual.entityType) {
+open class Enemy(val data: EnemyData) : EntityCreature(data.visual.entityType) {
     val ai = Ai(this, CoroutineScope(Dispatchers.Default + SupervisorJob()))
 
     init {
@@ -33,7 +33,8 @@ class Enemy(val data: EnemyData) : EntityCreature(data.visual.entityType) {
     }
 
     override fun spawn() {
-        ai.start(instance as RogueInstance)
+        if (instance is RogueInstance)
+            ai.start(instance as RogueInstance)
     }
 
     override fun despawn() {
@@ -41,9 +42,14 @@ class Enemy(val data: EnemyData) : EntityCreature(data.visual.entityType) {
     }
 
     override fun damage(damage: Damage): Boolean {
-       (damage.source as? LivingEntity)?.let { ai.interrupt(Ai.ContextKey.TARGET, it) }
+        (damage.source as? LivingEntity)?.let {
+            ai.interrupt(Ai.ContextKey.TARGET, it)
+        }
         return super.damage(damage)
     }
 
+    /**
+     * Don't tick vanilla ai.
+     */
     override fun aiTick(time: Long) {}
 }

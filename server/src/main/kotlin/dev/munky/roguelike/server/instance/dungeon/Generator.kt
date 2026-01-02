@@ -125,6 +125,7 @@ class BackTrackingGenerator(
             bounds = rootBounds,
             connections = rootBp.connectionsWith(rootRotation).associateWithTo(LinkedHashMap()) { null }
         )
+
         index(rootBounds.containedChunks(), root)
         logDebug {
             "plan(): placed root room '${rootBp.id}' at ${BlockVec.ZERO} rot=$rootRotation; openConns=${root.connections.size}; spatialBuckets=${spatialBin.size}"

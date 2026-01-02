@@ -3,6 +3,8 @@ package dev.munky.roguelike.server.item
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.player.RoguePlayer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.PlayerHand
 import net.minestom.server.event.Event
