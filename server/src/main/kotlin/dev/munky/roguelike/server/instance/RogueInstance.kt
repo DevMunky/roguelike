@@ -46,7 +46,7 @@ abstract class RogueInstance(
     }
 
     companion object : RenderContext.Key<RogueInstance> {
-        val EVENT_NODE: EventNode<InstanceEvent> = EventNode.type("${Roguelike.NAMESPACE}:instance", EventFilter.INSTANCE)
+        private val EVENT_NODE: EventNode<InstanceEvent> = EventNode.type("${Roguelike.NAMESPACE}:instance", EventFilter.INSTANCE)
 
         fun initialize() {
             EVENT_NODE.addListener(AddEntityToInstanceEvent::class.java) {

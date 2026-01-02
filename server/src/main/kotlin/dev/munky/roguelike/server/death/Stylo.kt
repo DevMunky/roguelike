@@ -32,7 +32,7 @@ class Stylo : Enemy(EnemyData(
     listOf(
         StareDownTarget
     )
-)) {
+), Source.Stylo) {
     val skinTexture = ""
     val skinSignature = ""
     val username = "Stylo"

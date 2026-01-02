@@ -6,6 +6,7 @@ import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.enemy.Enemy
+import dev.munky.roguelike.server.enemy.Enemy.Source
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.Dungeon
 import dev.munky.roguelike.server.instance.dungeon.ModifierSelectRenderer
@@ -42,7 +43,7 @@ fun testEnemy() = command("testEnemy") {
         repeat(5) {
             val x = origin.x + (Random.nextDouble() * radius - halfRadius).toInt()
             val z = origin.z + (Random.nextDouble() * radius - halfRadius).toInt()
-            val e = Enemy(data)
+            val e = Enemy(data, Source.WhyNot)
             e.setInstance(s.instance, Pos(x, origin.y, z))
         }
     }

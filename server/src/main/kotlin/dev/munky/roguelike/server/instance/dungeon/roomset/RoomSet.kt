@@ -184,6 +184,7 @@ sealed class RoomBlueprint(
         return when (target) {
             EnemyFeature.ID -> EnemyFeature(
                 name = name,
+                poolName = pool,
                 pool = parent.pools[pool],
                 finalBlock = finalBlock,
                 position = offsetFromCenter,
@@ -191,6 +192,7 @@ sealed class RoomBlueprint(
             )
             else -> ConnectionFeature(
                 name = name,
+                poolName = pool,
                 pool = parent.pools[pool],
                 finalBlock = finalBlock,
                 position = offsetFromCenter,
@@ -357,6 +359,7 @@ sealed interface JigsawData {
 
 data class EnemyFeature(
     override val name: String,
+    override val poolName: String,
     val pool: Pool?,
     override val finalBlock: Block,
 
@@ -364,7 +367,6 @@ data class EnemyFeature(
     override val direction: Direction
 ) : JigsawData {
     override val target: String get() = ID
-    override val poolName: String get() = pool?.id ?: ""
 
     companion object {
         const val ID = "roguelike:enemy"
@@ -373,6 +375,7 @@ data class EnemyFeature(
 
 data class ConnectionFeature(
     override val name: String,
+    override val poolName: String,
     val pool: Pool?,
     override val finalBlock: Block,
 
@@ -380,7 +383,6 @@ data class ConnectionFeature(
     override val direction: Direction
 ) : JigsawData {
     override val target: String get() = ID
-    override val poolName: String get() = pool?.id ?: ""
 
     companion object {
         const val ID = "roguelike:connection"
