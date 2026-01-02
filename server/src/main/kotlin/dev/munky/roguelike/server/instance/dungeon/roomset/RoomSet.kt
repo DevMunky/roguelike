@@ -32,9 +32,7 @@ class RoomSet private constructor(val data: RoomSetData) {
     /**
      * Pool id -> WeightedRandomList of room ids.
      */
-    val pools = data.pools.mapValues { (k, v) -> Pool.of(this, k, v) }
-
-
+    val pools = data.roomPools.mapValues { (k, v) -> Pool.of(this, k, v) }
 
     val rootRoomId = "$id/$ROOT_ROOM_ID"
 
@@ -66,15 +64,15 @@ class RoomSet private constructor(val data: RoomSetData) {
 
 data class Pool (
     val id: String,
-    val rooms: WeightedRandomList<String>,
+    val entries: WeightedRandomList<String>,
     val connectedPools: List<String>
 ) {
     companion object {
         fun of(roomSet: RoomSet, id: String, data: PoolData) : Pool {
             val connections = arrayListOf(id)
             val rooms = HashMap<String, Double>()
-            gatherRooms(roomSet.data.pools, rooms, data)
-            gatherConnections(roomSet.data.pools, connections, data)
+            gatherRooms(roomSet.data.roomPools, rooms, data)
+            gatherConnections(roomSet.data.roomPools, connections, data)
             return Pool(
                 id,
                 WeightedRandomList(rooms),
@@ -87,7 +85,7 @@ data class Pool (
                 is ReferencePoolData -> gatherConnections(pools, connections, pools[pool.id]!!)
                 is UnionPoolData -> pool.pools.forEach { gatherConnections(pools, connections, it) }
 
-                is RoomPoolData -> connections += pools.entries.first { it.value == pool }.key
+                is TerminalPoolData -> connections += pools.entries.first { it.value == pool }.key
             }
         }
 
@@ -96,9 +94,18 @@ data class Pool (
                 is ReferencePoolData -> gatherRooms(pools, rooms, pools[pool.id]!!)
                 is UnionPoolData -> pool.pools.forEach { gatherRooms(pools, rooms, it) }
 
-                is RoomPoolData -> rooms.putAll(pool.rooms)
+                is TerminalPoolData -> rooms.putAll(pool.rooms)
             }
         }
+    }
+}
+
+data class RoomFeatures(
+    val connections: List<ConnectionFeature>,
+    val enemies: List<EnemyFeature>
+) {
+    companion object {
+        val EMPTY = RoomFeatures(emptyList(), emptyList())
     }
 }
 
@@ -107,12 +114,12 @@ sealed class RoomBlueprint(
     val parent: RoomSet,
     val data: RoomData,
 ) {
-    protected val connectionCache = EnumMap<Rotation, List<JigsawConnection>>(Rotation::class.java)
+    protected val featureCache = EnumMap<Rotation, RoomFeatures>(Rotation::class.java)
     protected val regionCache = EnumMap<Rotation, Region.Cuboid>(Rotation::class.java)
 
     protected abstract val size: Point
     protected abstract suspend fun setBlocksUnsafe(instance: Instance, x: Double, y: Double, z: Double, rotation: Rotation)
-    protected abstract fun computeConnectionsWith(rotation: Rotation) : List<JigsawConnection>
+    protected abstract fun computeFeaturesWith(rotation: Rotation) : RoomFeatures
 
     abstract suspend fun initialize()
 
@@ -121,15 +128,15 @@ sealed class RoomBlueprint(
         return r.offset(at.toJoml()) as Region.Cuboid
     }
 
-    fun connectionsWith(rotation: Rotation) : List<JigsawConnection> {
-        connectionCache[rotation]?.let {
+    fun featuresWith(rotation: Rotation) : RoomFeatures {
+        featureCache[rotation]?.let {
             return it
         }
 
-        val result = computeConnectionsWith(rotation)
+        val result = computeFeaturesWith(rotation)
 
         // Cache to avoid recomputing
-        connectionCache[rotation] = result
+        featureCache[rotation] = result
         return result
     }
 
@@ -153,7 +160,7 @@ sealed class RoomBlueprint(
     }
 
     @Contract("_, _, null, _ -> null; _, _, !null, _ -> !null")
-    protected fun connectionFromJigsaw(block: Block, position: Point, nbt: CompoundBinaryTag?, rotation: Rotation) : JigsawConnection? {
+    protected fun featureFromBlock(block: Block, position: Point, nbt: CompoundBinaryTag?, rotation: Rotation) : JigsawData? {
         nbt ?: return null
         if (!block.compare(Block.JIGSAW, Block.Comparator.ID)) return null
 
@@ -174,14 +181,22 @@ sealed class RoomBlueprint(
         val baseDir = directionFromOrientation(orientation)
         val dir = rotation.rotate(baseDir)
 
-        return JigsawConnection(
-            name = name,
-            pool = parent.pools[pool],
-            finalBlock = finalBlock,
-            target = target,
-            position = offsetFromCenter,
-            direction = dir
-        )
+        return when (target) {
+            EnemyFeature.ID -> EnemyFeature(
+                name = name,
+                pool = parent.pools[pool],
+                finalBlock = finalBlock,
+                position = offsetFromCenter,
+                direction = dir
+            )
+            else -> ConnectionFeature(
+                name = name,
+                pool = parent.pools[pool],
+                finalBlock = finalBlock,
+                position = offsetFromCenter,
+                direction = dir
+            )
+        }
     }
 
     /**
@@ -254,21 +269,27 @@ private class NormalRoomBlueprint(
         }
     }
 
-    override fun computeConnectionsWith(rotation: Rotation): List<JigsawConnection> {
-        if (structure.blocks.isEmpty()) return emptyList()
-        val result = ArrayList<JigsawConnection>()
+    override fun computeFeaturesWith(rotation: Rotation): RoomFeatures {
+        if (structure.blocks.isEmpty()) return RoomFeatures.EMPTY
+        val palette = structure.palettes.firstOrNull() ?: return RoomFeatures.EMPTY
 
-        val palette = structure.palettes.firstOrNull() ?: return result
+        val connections = ArrayList<ConnectionFeature>()
+        val enemies = ArrayList<EnemyFeature>()
 
         for (bi in structure.blocks) {
             val block = palette[bi.paletteIndex]
 
             val nbt = bi.blockEntity?.data ?: continue
 
-            result += connectionFromJigsaw(block, bi.pos, nbt, rotation) ?: continue
+            val feature = featureFromBlock(block, bi.pos, nbt, rotation) ?: continue
+
+            when (feature) {
+                is ConnectionFeature -> connections.add(feature)
+                is EnemyFeature -> enemies.add(feature)
+            }
         }
 
-        return result
+        return RoomFeatures(connections, enemies)
     }
 
     /**
@@ -321,15 +342,50 @@ private class NormalRoomBlueprint(
     }
 }
 
-data class JigsawConnection(
-    val name: String,
-    val pool: Pool?,
-    val finalBlock: Block,
-    val target: String,
+sealed interface JigsawData {
+    val name: String
+    val poolName: String
+    val finalBlock: Block
+    /**
+     * Used for identification of different features
+     */
+    val target: String
 
-    val position: BlockVec,
+    val position: BlockVec
     val direction: Direction
-)
+}
+
+data class EnemyFeature(
+    override val name: String,
+    val pool: Pool?,
+    override val finalBlock: Block,
+
+    override val position: BlockVec,
+    override val direction: Direction
+) : JigsawData {
+    override val target: String get() = ID
+    override val poolName: String get() = pool?.id ?: ""
+
+    companion object {
+        const val ID = "roguelike:enemy"
+    }
+}
+
+data class ConnectionFeature(
+    override val name: String,
+    val pool: Pool?,
+    override val finalBlock: Block,
+
+    override val position: BlockVec,
+    override val direction: Direction
+) : JigsawData {
+    override val target: String get() = ID
+    override val poolName: String get() = pool?.id ?: ""
+
+    companion object {
+        const val ID = "roguelike:connection"
+    }
+}
 
 @Serializable
 data class RoomSetData(
@@ -339,19 +395,20 @@ data class RoomSetData(
     /**
      * A map of pool names to groupings of rooms.
      */
-    val pools: Map<String, PoolData>
+    val roomPools: Map<String, PoolData>,
+    val enemyPools: Map<String, PoolData>,
 ) {
     init {
-        for ((id, element) in pools) when (element) {
-            is ReferencePoolData -> error("Must not have a reference pool in Roomset pools.")
+        for ((id, element) in roomPools) when (element) {
+            is ReferencePoolData -> error("Must not have a reference pool in object 'room_pools', nothing to reference.")
             is UnionPoolData -> {
-                for (pool in element.pools) if (pool is ReferencePoolData && !pools.containsKey(pool.id)) {
-                    LOGGER.warn("Pool '$id' of Roomset '${this.id}' references pool '$pool' which does not exist.")
+                for (pool in element.pools) if (pool is ReferencePoolData && !roomPools.containsKey(pool.id)) {
+                    LOGGER.warn("Pool '$id' of roomset '${this.id}' references pool '$pool' which does not exist.")
                 }
             }
-            is RoomPoolData -> {
+            is TerminalPoolData -> {
                 for (room in element.rooms.keys) if (!rooms.containsKey(room)) {
-                    LOGGER.warn("Pool '$id' of Roomset '${this.id}' references room '$room' which does not exist.")
+                    LOGGER.warn("Pool '$id' of roomset '${this.id}' references room '$room' which does not exist.")
                 }
             }
         }
@@ -373,7 +430,7 @@ data class ReferencePoolData(
 
 @Serializable
 @SerialName("room_pool")
-data class RoomPoolData(
+data class TerminalPoolData(
     val rooms: Map<String, Double>
 ) : PoolData
 

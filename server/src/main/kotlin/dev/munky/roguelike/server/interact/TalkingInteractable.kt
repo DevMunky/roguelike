@@ -68,6 +68,11 @@ abstract class TalkingInteractableCreature(type: EntityType) : HoverableInteract
             super.tick(time)
             return
         }
+        val player = targetPlayers.peek()
+        if (player.instance != instance) {
+            targetPlayers.pop()
+            return
+        }
         lookAt(targetPlayers.peek())
         super.tick(time)
     }

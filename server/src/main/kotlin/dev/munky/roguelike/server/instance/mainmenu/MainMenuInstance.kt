@@ -1,7 +1,11 @@
 package dev.munky.roguelike.server.instance.mainmenu
 
 import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
+import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.instance.RogueInstance
+import dev.munky.roguelike.server.interact.Conversation
+import dev.munky.roguelike.server.interact.NpcPlayer
+import dev.munky.roguelike.server.interact.conversation
 import dev.munky.roguelike.server.player.RoguePlayer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.instance.LightingChunk
@@ -24,6 +28,10 @@ class MainMenuInstance private constructor() : RogueInstance(UUID.randomUUID(), 
     }
 
     override fun onEnter(player: RoguePlayer) {
+        val fake = object: NpcPlayer("", null, null) {
+            override val conversation: Conversation = conversation("".asComponent()) {}
+        }
+        fake.setInstance(this, player.position)
         RenderDispatch.with(MainMenuRenderer)
             .with(player)
             .dispatch()

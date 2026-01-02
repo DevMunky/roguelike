@@ -7,7 +7,7 @@ import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
 import dev.munky.roguelike.common.renderdispatcherapi.RenderHandleManager
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomBlueprint
-import dev.munky.roguelike.server.instance.dungeon.roomset.JigsawConnection
+import dev.munky.roguelike.server.instance.dungeon.roomset.ConnectionFeature
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
 import dev.munky.roguelike.server.instance.town.TownInstance.Companion.TOWN_DIMENSION_KEY
 import dev.munky.roguelike.server.interact.InteractableRegion
@@ -86,7 +86,7 @@ class Dungeon private constructor(
 
     private suspend fun createRoom(
         bp: RoomBlueprint,
-        connections: MutableMap<JigsawConnection, Room?>,
+        connections: MutableMap<ConnectionFeature, Room?>,
         at: BlockVec,
         rotation: Rotation
     ): Room {
@@ -104,8 +104,8 @@ class Dungeon private constructor(
             val pr = stack.removeLast()
             if (plannedToReal.containsKey(pr)) continue
 
-            val connections = HashMap<JigsawConnection, Room?>(pr.connections.size)
-            pr.blueprint.connectionsWith(pr.rotation).associateWithTo(connections) { null as Room? }
+            val connections = HashMap<ConnectionFeature, Room?>(pr.connections.size)
+            pr.blueprint.featuresWith(pr.rotation).connections.associateWithTo(connections) { null as Room? }
 
             val room = createRoom(pr.blueprint, connections, pr.position, pr.rotation)
             plannedToReal[pr] = room
@@ -141,7 +141,7 @@ class Dungeon private constructor(
         /**
          * The connections of this room in the world.
          */
-        val connections: MutableMap<JigsawConnection, Room?>,
+        val connections: MutableMap<ConnectionFeature, Room?>,
         val position: BlockVec,
         override val region: Region
     ) : InteractableRegion, RenderHandleManager, RenderContext.Element {

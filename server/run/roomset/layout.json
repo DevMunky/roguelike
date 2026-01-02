@@ -14,7 +14,10 @@
     "layout/room/small_loot": { "type": "normal" },
     "layout/room/drop": { "type": "normal" }
   },
-  "pools": {
+  "enemy_pools": {
+
+  },
+  "room_pools": {
     "roguelike:room_connections": {
       "type": "room_pool",
       "rooms": {

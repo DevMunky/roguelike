@@ -1,7 +1,7 @@
 package dev.munky.roguelike.server.instance.dungeon
 
 import dev.munky.roguelike.common.logger
-import dev.munky.roguelike.server.instance.dungeon.roomset.JigsawConnection
+import dev.munky.roguelike.server.instance.dungeon.roomset.ConnectionFeature
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
 import dev.munky.roguelike.server.interact.Region
 import net.hollowcube.schem.util.Rotation
@@ -44,7 +44,7 @@ data class PlannedRoom(
     val position: BlockVec,
     val rotation: Rotation,
     val bounds: Region,
-    val connections: MutableMap<JigsawConnection, PlannedRoom?>
+    val connections: MutableMap<ConnectionFeature, PlannedRoom?>
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -123,7 +123,7 @@ class BackTrackingGenerator(
             position = BlockVec(0, 100, 0),
             rotation = rootRotation,
             bounds = rootBounds,
-            connections = rootBp.connectionsWith(rootRotation).associateWithTo(LinkedHashMap()) { null }
+            connections = rootBp.featuresWith(rootRotation).connections.associateWithTo(LinkedHashMap()) { null }
         )
 
         index(rootBounds.containedChunks(), root)
@@ -179,7 +179,7 @@ class BackTrackingGenerator(
             return Generator.Result.Failure.NO_POOL
         }
 
-        if (pool.rooms.isEmpty()) {
+        if (pool.entries.isEmpty()) {
             logDebug { "generate(): EMPTY_POOL for pool='${conn.pool}'" }
             return Generator.Result.Failure.EMPTY_POOL
         }
@@ -202,7 +202,7 @@ class BackTrackingGenerator(
     private suspend fun satisfyConnection(
         room: PlannedRoom,
         depth: Int,
-        conn: JigsawConnection,
+        conn: ConnectionFeature,
         pool: Pool
     ): Generator.Result {
         // Build a read-only snapshot of the spatial plan for worker threads
@@ -212,7 +212,7 @@ class BackTrackingGenerator(
         stats.spatialBinCopies++
         stats.spatialBinAverageCopySize = (snapshot.size + stats.spatialBinCopies * stats.spatialBinAverageCopySize) / (stats.spatialBinCopies.toDouble() + 1)
 
-        val candidates = computeCandidates(room, conn, pool, pool.rooms, snapshot)
+        val candidates = computeCandidates(room, conn, pool, pool.entries, snapshot)
         if (candidates.isEmpty()) {
             logDebug { "satisfyConnection(): NO_VALID_CONNECTION - no candidates fit geometry" }
             return Generator.Result.Failure.NO_VALID_CONNECTION
@@ -259,18 +259,18 @@ class BackTrackingGenerator(
         return Generator.Result.Failure.NO_VALID_CONNECTION
     }
 
-    private fun pickNextConnector(room: PlannedRoom): JigsawConnection {
+    private fun pickNextConnector(room: PlannedRoom): ConnectionFeature {
         val open = room.connections.keys.filter { room.connections[it] == null }
         return open.minBy { conn ->
             // smaller pool → more constrained → try first
-            conn.pool?.rooms?.size ?: Int.MAX_VALUE
+            conn.pool?.entries?.size ?: Int.MAX_VALUE
         }
     }
 
     private fun computeCandidatePosition(
         room: PlannedRoom,
-        conn: JigsawConnection,
-        candidateConn: JigsawConnection
+        conn: ConnectionFeature,
+        candidateConn: ConnectionFeature
     ): BlockVec {
         val connectorPos = conn.position.add(room.position)
         val otherPos = connectorPos.add(
@@ -321,15 +321,15 @@ class BackTrackingGenerator(
         val rot: Rotation,
         val pos: BlockVec,
         val region: Region,
-        val connections: List<JigsawConnection>,
-        val matchedConn: JigsawConnection,
+        val connections: List<ConnectionFeature>,
+        val matchedConn: ConnectionFeature,
         val chunks: LongArray
     )
 
     // Owner spawns workers on Default dispatcher to evaluate candidates against snapshot
     private suspend fun computeCandidates(
         owner: PlannedRoom,
-        hostConnection: JigsawConnection,
+        hostConnection: ConnectionFeature,
         pool: Pool,
         rooms: WeightedRandomList<String>,
         snapshot: Map<Long, LinkedList<PlannedRoom>>
@@ -347,7 +347,7 @@ class BackTrackingGenerator(
         for (roomId in sampled) {
             val bp = roomset.rooms[roomId] ?: continue
             for (rot in Rotation.entries/*.shuffled(random)*/) {
-                val candidateConnections = bp.connectionsWith(rot)
+                val candidateConnections = bp.featuresWith(rot).connections
                 var hasReciprocalConnection = false
                 for (childConnection in candidateConnections) {
                     val childPool = childConnection.pool ?: break

@@ -15,7 +15,7 @@ data class FlameBurst(override val data: ModifierData) : Modifier {
 
     override fun attack(ctx: AttackContext) {
         ctx.actions += entitiesInFront(ctx.instance, ctx.player.position, 1.0, 3.0).map {
-            InstantBurn(it, 3f)
+            InstantBurn(3f, it)
         }
     }
 }

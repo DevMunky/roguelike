@@ -9,9 +9,9 @@ import net.minestom.server.network.packet.server.play.PlayerInfoUpdatePacket
  * A fake player.
  */
 abstract class NpcPlayer(
-    override val username: String,
-    override val skinTexture: String? = null,
-    override val skinSignature: String? = null
+    val username: String,
+    val skinTexture: String? = null,
+    val skinSignature: String? = null
 ) : TalkingInteractableCreature(EntityType.PLAYER) {
     override fun updateNewViewer(player: Player) {
         val properties = ArrayList<PlayerInfoUpdatePacket.Property>()
