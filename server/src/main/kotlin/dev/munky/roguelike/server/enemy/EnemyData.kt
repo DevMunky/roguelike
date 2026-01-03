@@ -2,12 +2,14 @@ package dev.munky.roguelike.server.enemy
 
 import dev.munky.roguelike.server.EntityTypeSerializer
 import dev.munky.roguelike.server.enemy.ai.behavior.AiBehavior
+import dev.munky.roguelike.server.interact.FakePlayer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityCreature
 import net.minestom.server.entity.EntityType
+import net.minestom.server.entity.LivingEntity
 import net.minestom.server.entity.pathfinding.followers.FlyingNodeFollower
 import net.minestom.server.entity.pathfinding.followers.GroundNodeFollower
 import net.minestom.server.entity.pathfinding.followers.NodeFollower
@@ -32,7 +34,7 @@ enum class EnemyMovementType(val follower: (Entity)->NodeFollower, val generator
 sealed interface EntityVisualType {
     val entityType: EntityType
 
-    fun createEntity() : EntityCreature
+    fun createEntity() : LivingEntity
 
     @Serializable
     @SerialName("vanilla")
@@ -40,7 +42,18 @@ sealed interface EntityVisualType {
         @Serializable(with = EntityTypeSerializer::class)
         override val entityType: EntityType
     ) : EntityVisualType {
-        override fun createEntity(): EntityCreature = EntityCreature(entityType)
+        override fun createEntity(): LivingEntity = LivingEntity(entityType)
+    }
+
+    @Serializable
+    @SerialName("player")
+    data class Player(
+        val username: String,
+        val skinTexture: String? = null,
+        val skinSignature: String? = null,
+    ) : EntityVisualType {
+        override val entityType: EntityType = EntityType.PLAYER
+        override fun createEntity(): LivingEntity = FakePlayer(username, skinTexture, skinSignature)
     }
 
     @SerialName("model")
@@ -48,6 +61,6 @@ sealed interface EntityVisualType {
     data class Model(val model: String) : EntityVisualType {
         @Transient
         override val entityType: EntityType = EntityType.INTERACTION
-        override fun createEntity(): EntityCreature = TODO("Model Implementation")
+        override fun createEntity(): LivingEntity = TODO("Model Implementation")
     }
 }

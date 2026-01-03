@@ -76,9 +76,6 @@ class Roguelike private constructor() {
         Path("modifier/"),
         key = { id }
     )
-    /**
-     * Contains all default Modifiers.
-     */
     fun modifiers() : IResourceStore<ModifierData> = modifierStore
 
     private val roomSetStore = MappedResourceStore(

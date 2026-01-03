@@ -1,6 +1,7 @@
 package dev.munky.roguelike.server.item
 
 import dev.munky.roguelike.common.launch
+import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.item.modifier.ModifierData
@@ -81,7 +82,7 @@ data class WeaponData(
             "Sword".asComponent()
         ),
         SPELL(
-            "roguelike:weapon.spell",
+            "${Roguelike.NAMESPACE}:weapon/spell",
             "Spell".asComponent()
         )
     }

@@ -369,7 +369,7 @@ data class EnemyFeature(
     override val target: String get() = ID
 
     companion object {
-        const val ID = "roguelike:enemy"
+        const val ID = "${Roguelike.NAMESPACE}:enemy"
     }
 }
 
@@ -385,7 +385,7 @@ data class ConnectionFeature(
     override val target: String get() = ID
 
     companion object {
-        const val ID = "roguelike:connection"
+        const val ID = "${Roguelike.NAMESPACE}:connection"
     }
 }
 

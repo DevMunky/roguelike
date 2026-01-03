@@ -228,7 +228,7 @@ class Dungeon private constructor(
         }
 
         companion object : RenderContext.Key<Room> {
-            private val EVENT_NODE = EventNode.all("roguelike:dungeon_room")
+            private val EVENT_NODE = EventNode.all("${Roguelike.NAMESPACE}:dungeon_room")
         }
     }
 

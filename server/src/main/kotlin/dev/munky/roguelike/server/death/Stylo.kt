@@ -12,14 +12,6 @@ import dev.munky.roguelike.server.player.RoguePlayer
 import dev.munky.roguelike.server.raycast.Ray
 import dev.munky.roguelike.server.util.ParticleUtil
 import net.minestom.server.coordinate.Vec
-import net.minestom.server.entity.EntityType
-import net.minestom.server.entity.GameMode
-import net.minestom.server.entity.Metadata
-import net.minestom.server.entity.MetadataDef
-import net.minestom.server.entity.Player
-import net.minestom.server.network.packet.server.play.EntityMetaDataPacket
-import net.minestom.server.network.packet.server.play.PlayerInfoRemovePacket
-import net.minestom.server.network.packet.server.play.PlayerInfoUpdatePacket
 import net.minestom.server.particle.Particle
 
 /**
@@ -27,42 +19,12 @@ import net.minestom.server.particle.Particle
  */
 class Stylo : Enemy(EnemyData(
     "stylo",
-    EntityVisualType.Vanilla(EntityType.PLAYER),
+    EntityVisualType.Player("Stylo", "", ""),
     EnemyMovementType.WALKING,
     listOf(
         StareDownTarget
     )
 ), Source.Stylo) {
-    val skinTexture = ""
-    val skinSignature = ""
-    val username = "Stylo"
-
-    override fun updateNewViewer(player: Player) {
-        val properties = listOf(
-            PlayerInfoUpdatePacket.Property("textures", skinTexture, skinSignature)
-        )
-
-        val entry = PlayerInfoUpdatePacket.Entry(
-            uuid, username, properties, false,
-            0, GameMode.SURVIVAL, null, null, 0, true
-        )
-        player.sendPacket(PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.ADD_PLAYER, entry))
-
-        // Spawn the player entity
-        super.updateNewViewer(player)
-
-        // Enable skin layers
-        player.sendPackets(EntityMetaDataPacket(entityId,
-            mapOf(MetadataDef.Player.DISPLAYED_MODEL_PARTS_FLAGS.index() to Metadata.Byte((0.inv()).toByte()))
-        ))
-    }
-
-    @Suppress("UnstableApiUsage")
-    override fun updateOldViewer(player: Player) {
-        super.updateOldViewer(player)
-        player.sendPacket(PlayerInfoRemovePacket(uuid))
-    }
-
     override fun tick(time: Long) {
         super.tick(time)
         val instance = instance as? RogueInstance ?: return

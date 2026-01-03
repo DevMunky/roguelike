@@ -1,6 +1,7 @@
 package dev.munky.roguelike.server.enemy.ai.behavior
 
 import dev.munky.roguelike.server.enemy.ai.Ai
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerialName
@@ -24,11 +25,13 @@ object ChaseTarget : AiBehavior {
 
     override suspend fun <T> start(context: Ai<T>.Context, entity: T) where T : LivingEntity, T : NavigableEntity {
         val target = context[Ai.ContextKey.TARGET] ?: return
-        while (!target.isDead) {
-            withTimeoutOrNull(10000) {
-                entity.navigator.setPathTo(target.position, 1.5, 60.0, 200.0) {}
-            } ?: return
-            delay(200)
+        try {
+            while (!target.isDead) {
+                entity.navigator.setPathTo(target.position, 1.5, 60.0, 60.0) {}
+                delay(100)
+            }
+        } catch (e: CancellationException) {
+            entity.navigator.setPathTo(null)
         }
     }
 }

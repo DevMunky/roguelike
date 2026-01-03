@@ -62,7 +62,8 @@ data class ModifierData(
     override fun buildItemStack(): ItemStack {
         return ItemStack.builder(Material.PAPER)
             .customName(Component.text(id))
-            .itemModel("${Roguelike.NAMESPACE}:$id")
+            // .itemModel("${Roguelike.NAMESPACE}:modifier/$id")
+            .itemModel("minecraft:rib_armor_trim_smithing_template")
             .lore(description)
             .build()
     }

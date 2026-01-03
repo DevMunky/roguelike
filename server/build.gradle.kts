@@ -11,7 +11,6 @@ dependencies {
     }
     implementation(libs.adventure.minimessage)
     implementation(libs.joml)
-    implementation(libs.bundles.polyglot)
 
     implementation(libs.bundles.logback)
 }

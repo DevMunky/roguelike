@@ -4,6 +4,7 @@ import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
 import dev.munky.roguelike.common.renderdispatcherapi.RenderHandle
 import dev.munky.roguelike.common.renderdispatcherapi.Renderer
 import dev.munky.roguelike.server.RenderKey
+import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.interact.HoverableInteractableCreature
 import dev.munky.roguelike.server.item.modifier.ModifierData
@@ -20,7 +21,6 @@ import net.minestom.server.entity.metadata.display.TextDisplayMeta
 import net.minestom.server.entity.metadata.other.InteractionMeta
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
-import net.minestom.server.timer.TaskSchedule
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -44,6 +44,7 @@ object ModifierSelectRenderer : Renderer {
         val halfPi = PI / 2.0
         val n = modifiers.size
         val offsets = Array(n) { i ->
+            // modifiers start directly above the container
             val theta = if (n == 1) {
                 halfPi
             } else {
@@ -51,6 +52,7 @@ object ModifierSelectRenderer : Renderer {
                 (halfPi - width / 2.0) + t * width
             }
 
+            // cylindrical coordinates ; no yaw
             val dx = radius * cos(theta)
             val dy = radius * sin(theta)
             val dz = 0.0
@@ -58,6 +60,7 @@ object ModifierSelectRenderer : Renderer {
             val cosYaw = cos(yawRad)
             val sinYaw = sin(yawRad)
 
+            // factor in yaw ; spherical coordinates
             val rx = dx * cosYaw + dz * sinYaw
             val rz = -dx * sinYaw + dz * cosYaw
 
@@ -88,7 +91,8 @@ object ModifierSelectRenderer : Renderer {
         }
     }
 
-    class Container(val handle: RenderHandle, val player: RoguePlayer) : HoverableInteractableCreature(EntityType.INTERACTION) {
+    class Container(val handle: RenderHandle, val player: RoguePlayer) :
+        HoverableInteractableCreature(EntityType.INTERACTION) {
         init {
             isAutoViewable = false
             editEntityMeta(InteractionMeta::class.java) {
@@ -98,23 +102,24 @@ object ModifierSelectRenderer : Renderer {
             setBoundingBox(1.0, 1.0, 1.0)
         }
 
-        val itemDisplay = Entity(EntityType.ITEM_DISPLAY).apply {
+        val display = Entity(EntityType.ITEM_DISPLAY).apply {
             editEntityMeta(ItemDisplayMeta::class.java) {
-                it.itemStack = ItemStack.of(Material.PAPER).with(DataComponents.ITEM_MODEL, "roguelike:modifier_container")
+                it.itemStack = ItemStack.of(Material.PAPER)
+                    .with(DataComponents.ITEM_MODEL, "${Roguelike.NAMESPACE}:modifier_container")
             }
             isAutoViewable = false
         }
 
         override fun spawn() {
             addViewer(player)
-            itemDisplay.setInstance(instance, position)
-            itemDisplay.addViewer(player)
+            display.setInstance(instance, position)
+            display.addViewer(player)
 
-            addPassenger(itemDisplay)
+            addPassenger(display)
         }
 
         override fun despawn() {
-            itemDisplay.remove()
+            display.remove()
         }
 
         override fun onInteract(player: RoguePlayer) {
@@ -133,7 +138,7 @@ object ModifierSelectRenderer : Renderer {
          * Ticks
          */
         val spawnInterpolationDuration: Int
-    ): HoverableInteractableCreature(EntityType.INTERACTION) {
+    ) : HoverableInteractableCreature(EntityType.INTERACTION) {
         val height = 1.0
         val width = 1.0
 
@@ -171,7 +176,8 @@ object ModifierSelectRenderer : Renderer {
         val name = Entity(EntityType.TEXT_DISPLAY).apply {
             editEntityMeta(TextDisplayMeta::class.java) {
                 it.billboardRenderConstraints = AbstractDisplayMeta.BillboardConstraints.FIXED
-                it.text = (item.entityMeta as ItemDisplayMeta).itemStack.get(DataComponents.CUSTOM_NAME)
+                it.text =
+                    (item.entityMeta as ItemDisplayMeta).itemStack.get(DataComponents.CUSTOM_NAME)
                 it.translation = Vec(0.0, nameOffset, 0.0)
                 it.transformationInterpolationDuration = 1
             }
@@ -187,7 +193,8 @@ object ModifierSelectRenderer : Renderer {
                     desc = desc.append(l.asComponent())
                 }
                 it.text = desc
-                it.translation = Vec(0.0, descriptionOffset - (modifier.description.size * 0.2), 0.0)
+                it.translation =
+                    Vec(0.0, descriptionOffset - (modifier.description.size * 0.2), 0.0)
             }
             isAutoViewable = false
         }

@@ -21,6 +21,18 @@ object MiniMessageSerializer : KSerializer<Component> by String.serializer().xma
     val MINIMESSAGE = MiniMessage.builder().build()
 }
 
+/**
+ * This is so scuffed, maybe I will fork schem to better implement this specifically with StructureReader.
+ *
+ * Right now I serialize the structure to bytes, then deserialize to a BinaryTag, THEN convert that to KNbt, THEN serialize that
+ * as bytes
+ *
+ * To deserialize I deserialize bytes to KNbt, then convert to BinaryTag, then serialize as bytes, then deserialize as Structure.
+ *
+ * I could easily bypass the BinaryTag part and use KNbt but that still doesn't eliminate the intermediary serialization to
+ * bytes in order for StructureReader to work. I would like to fork schem to accept BinaryTag for reading and writing in order
+ * to support this better.
+ */
 object StructureSerializer : KSerializer<Structure> by BinaryTagSerializer.xmap(
     {
         val bytes = SchematicWriter.structure().write(this)

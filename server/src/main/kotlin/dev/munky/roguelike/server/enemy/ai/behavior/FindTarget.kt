@@ -2,6 +2,7 @@ package dev.munky.roguelike.server.enemy.ai.behavior
 
 import dev.munky.roguelike.server.enemy.ai.Ai
 import dev.munky.roguelike.server.player.RoguePlayer
+import dev.munky.roguelike.server.raycast.Ray
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -26,6 +27,13 @@ object FindTarget : AiBehavior {
             target = context[Ai.ContextKey.TARGET] ?: instance.getNearbyEntities(entity.position, MAX_DISTANCE)
                 .filterIsInstance<LivingEntity>()
                 .filter { it != entity && !it.isDead && if (it is RoguePlayer) !it.isDebug else true}
+                .filter {
+                    val dir = it.position.sub(entity.position).asVec().normalize()
+                    val blockRay = Ray(entity.position, dir, MAX_DISTANCE)
+                    val blocks = blockRay.findBlocks(instance)
+                    // filters out targets not occluded by any blocks between their feet
+                    blocks.nextClosest() == null
+                }
                 .minByOrNull { it.position.distanceSquared(entity.position) }
             delay(200)
         }

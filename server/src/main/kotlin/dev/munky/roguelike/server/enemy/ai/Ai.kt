@@ -85,6 +85,8 @@ data class Ai<T>(
             try {
                 LOGGER.debug("Switch to new behavior '${newBehavior::class.simpleName}'")
                 newBehavior.start(context, entity)
+                // LOGGER.debug("Stopping active behavior, start() returned.")
+                // stopActiveBehavior()
             } catch (e: CancellationException) {
                 // Handled natively: The behavior was interrupted.
                 // Any 'finally' blocks in the behavior will run for cleanup.
@@ -124,7 +126,7 @@ data class Ai<T>(
 
     @Suppress("unused")
     @JvmInline
-    value class ContextKey<T : Any> private constructor (private val id: String) {
+    value class ContextKey<T : Any> internal constructor (private val id: String) {
         companion object {
             val INSTANCE = ContextKey<RogueInstance>("rogue_instance")
             val TARGET = ContextKey<LivingEntity>("target")

@@ -7,9 +7,6 @@ kotlinx-coroutines = "1.10.2"
 # tooling
 gradleup-shadow = "9.2.2"
 
-# embedding
-polyglot = "25.0.1"
-
 # minecraft
 minestom = "2025.10.31-1.21.10"
 adventure = "4.25.0"
@@ -38,16 +35,12 @@ slf4j = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j"  }
 logback-core = { group = "ch.qos.logback", name = "logback-core", version.ref = "logback" }
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 
-polyglot-core = { module = "org.graalvm.polyglot:polyglot", version.ref = "polyglot" }
-polyglot-js = { module = "org.graalvm.js:js", version.ref = "polyglot" }
-
 joml = { module = "org.joml:joml", version.ref = "joml"}
 
 [bundles]
 logback = ["logback-core", "logback-classic"]
 kotlinx-coroutines = ["kotlinx-coroutines-core"]
 kotlinx-serialization = ["kotlinx-serialization-core", "kotlinx-serialization-json", "kotlinx-serialization-protobuf", "kotlinx-serialization-knbt"]
-polyglot = ["polyglot-core", "polyglot-js"]
 
 [plugins]
 kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
