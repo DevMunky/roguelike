@@ -13,16 +13,16 @@ import kotlin.math.pow
 object StareDownTarget : AiBehavior {
     const val MAX_DISTANCE = 20.0
 
-    override fun <T> priority(context: Ai<T>.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
-        val target = context[Ai.ContextKey.TARGET] ?: return 0.0
+    override fun <T> priority(context: Ai.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
+        val target = context[Ai.Context.Key.TARGET] ?: return 0.0
         val distance = entity.position.distanceSquared(target.position)
         val maxDistance = MAX_DISTANCE.pow(2)
         if (distance >= maxDistance) return 0.0
         return distance / maxDistance
     }
 
-    override suspend fun <T> start(context: Ai<T>.Context, entity: T) where T : LivingEntity, T : NavigableEntity {
-        val target = context[Ai.ContextKey.TARGET] ?: return
+    override suspend fun <T> start(context: Ai.Context, entity: T) where T : LivingEntity, T : NavigableEntity {
+        val target = context[Ai.Context.Key.TARGET] ?: return
         while (!target.isDead) {
             entity.lookAt(target)
             delay(50)

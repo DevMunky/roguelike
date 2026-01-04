@@ -43,7 +43,7 @@ fun testEnemy() = command("testEnemy") {
         repeat(5) {
             val x = origin.x + (Random.nextDouble() * radius - halfRadius).toInt()
             val z = origin.z + (Random.nextDouble() * radius - halfRadius).toInt()
-            val e = Enemy(data, Source.WhyNot)
+            val e = data.toEnemy(Source.WhyNot)
             e.setInstance(s.instance, Pos(x, origin.y, z))
         }
     }

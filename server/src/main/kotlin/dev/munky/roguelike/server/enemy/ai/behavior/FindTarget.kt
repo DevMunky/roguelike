@@ -14,17 +14,17 @@ import net.minestom.server.entity.pathfinding.NavigableEntity
 object FindTarget : AiBehavior {
     const val MAX_DISTANCE = 20.0
 
-    override fun <T> priority(context: Ai<T>.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity = when {
-        Ai.ContextKey.TARGET in context -> 0.0
-        Ai.ContextKey.INSTANCE !in context -> 0.0
+    override fun <T> priority(context: Ai.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity = when {
+        Ai.Context.Key.TARGET in context -> 0.0
+        Ai.Context.Key.INSTANCE !in context -> 0.0
         else -> 0.01
     }
 
-    override suspend fun <T> start(context: Ai<T>.Context, entity: T) where T : LivingEntity, T : NavigableEntity {
-        val instance = context[Ai.ContextKey.INSTANCE] ?: return
+    override suspend fun <T> start(context: Ai.Context, entity: T) where T : LivingEntity, T : NavigableEntity {
+        val instance = context[Ai.Context.Key.INSTANCE] ?: return
         var target: LivingEntity? = null
         while (target == null) {
-            target = context[Ai.ContextKey.TARGET] ?: instance.getNearbyEntities(entity.position, MAX_DISTANCE)
+            target = context[Ai.Context.Key.TARGET] ?: instance.getNearbyEntities(entity.position, MAX_DISTANCE)
                 .filterIsInstance<LivingEntity>()
                 .filter { it != entity && !it.isDead && if (it is RoguePlayer) !it.isDebug else true}
                 .filter {
@@ -37,6 +37,6 @@ object FindTarget : AiBehavior {
                 .minByOrNull { it.position.distanceSquared(entity.position) }
             delay(200)
         }
-        context[Ai.ContextKey.TARGET] = target
+        context[Ai.Context.Key.TARGET] = target
     }
 }

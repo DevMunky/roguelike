@@ -16,8 +16,8 @@ import kotlin.math.pow
 object MeleeAttackTarget : AiBehavior {
     const val ATTACK_DISTANCE = 2.0
 
-    override fun <T> priority(context: Ai<T>.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
-        val target = context[Ai.ContextKey.TARGET] ?: return 0.0
+    override fun <T> priority(context: Ai.Context, entity: T): Double where T : LivingEntity, T : NavigableEntity {
+        val target = context[Ai.Context.Key.TARGET] ?: return 0.0
         val distance = entity.position.distanceSquared(target.position)
         val maxDistance = ATTACK_DISTANCE.pow(2)
         if (distance >= maxDistance) return 0.0
@@ -25,11 +25,11 @@ object MeleeAttackTarget : AiBehavior {
     }
 
     override suspend fun <T> start(
-        context: Ai<T>.Context,
+        context: Ai.Context,
         entity: T
     ) where T : LivingEntity, T : NavigableEntity {
-        val target = context[Ai.ContextKey.TARGET] ?: return
-        val instance = context[Ai.ContextKey.INSTANCE] ?: return
+        val target = context[Ai.Context.Key.TARGET] ?: return
+        val instance = context[Ai.Context.Key.INSTANCE] ?: return
 
         while (!target.isDead && target.instance == entity.instance) {
             entity.lookAt(target)
@@ -45,6 +45,6 @@ object MeleeAttackTarget : AiBehavior {
             ))
             delay(590) // end lag
         }
-        context.remove(Ai.ContextKey.TARGET)
+        context.remove(Ai.Context.Key.TARGET)
     }
 }

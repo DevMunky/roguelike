@@ -7,7 +7,7 @@ import net.minestom.server.entity.pathfinding.NavigableEntity
 
 @Serializable
 sealed interface AiBehavior {
-    fun <T> priority(context: Ai<T>.Context, entity: T) : Double where T : LivingEntity, T: NavigableEntity
+    fun <T> priority(context: Ai.Context, entity: T) : Double where T : LivingEntity, T: NavigableEntity
 
-    suspend fun <T> start(context: Ai<T>.Context, entity: T) where T : LivingEntity, T: NavigableEntity
+    suspend fun <T> start(context: Ai.Context, entity: T) where T : LivingEntity, T: NavigableEntity
 }

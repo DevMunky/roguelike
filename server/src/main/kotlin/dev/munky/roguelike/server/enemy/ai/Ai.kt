@@ -1,5 +1,7 @@
 package dev.munky.roguelike.server.enemy.ai
 
+import dev.munky.roguelike.common.MutableTypedMap
+import dev.munky.roguelike.common.TypedMap
 import dev.munky.roguelike.common.logger
 import dev.munky.roguelike.server.enemy.ai.behavior.AiBehavior
 import dev.munky.roguelike.server.instance.RogueInstance
@@ -25,7 +27,7 @@ data class Ai<T>(
 
     fun start(instance: RogueInstance) {
         stopped = false
-        context[ContextKey.INSTANCE] = instance
+        context[Context.Key.INSTANCE] = instance
         coroutineScope.launch {
             while (isActive && !entity.isDead && !stopped) {
                 tick()
@@ -64,15 +66,15 @@ data class Ai<T>(
             switchBehavior(behavior)
     }
 
-    fun <T : Any> interrupt(key: ContextKey<T>, value: T?) {
+    fun <T : Any> interrupt(key: Context.Key<T>, value: T?) {
         if (context[key] == value) return
         LOGGER.debug("Interrupt '{}' is now {}", key, value)
         stopActiveBehavior()
-        value?.let { context.set(key, it) } ?: context.remove(key)
+        value?.let { context[key] = it } ?: context.remove(key)
     }
 
     private fun stopActiveBehavior() {
-        context.remove(ContextKey.TARGET)
+        context.remove(Context.Key.TARGET)
         activeJob?.cancel("Stopping active behavior.")
         activeBehavior = null
     }
@@ -95,41 +97,16 @@ data class Ai<T>(
     }
 
     @Suppress("UNCHECKED_CAST")
-    inner class Context {
-        private val data = ConcurrentHashMap<ContextKey<*>, Any>()
-
-        /**
-         * Get the value associated with a key or null if it doesn't exist.
-         */
-        operator fun <T : Any> get(key: ContextKey<T>) = data[key] as T?
-
-        /**
-         * Check if the context currently contains a value for a key.
-         */
-        operator fun <T : Any> contains(key: ContextKey<T>) = data.containsKey(key)
-
-        /**
-         * Sets a value in the context without interrupting.
-         */
-        operator fun <T : Any> set(key: ContextKey<T>, value: T) = data.put(key, value)
-
-        /**
-         * Removes a value from the context without interrupting.
-         */
-        fun <T : Any> remove(key: ContextKey<T>) : T? = data.remove(key) as T?
-
-        /**
-         * Interrupt the Ai associated with this context.
-         */
-        fun <T : Any> interrupt(key: ContextKey<T>, value: T?) = this@Ai.interrupt(key, value)
-    }
-
-    @Suppress("unused")
-    @JvmInline
-    value class ContextKey<T : Any> internal constructor (private val id: String) {
-        companion object {
-            val INSTANCE = ContextKey<RogueInstance>("rogue_instance")
-            val TARGET = ContextKey<LivingEntity>("target")
+    /**
+     * A map of all the values in this context.
+     */
+    class Context : MutableTypedMap<Context> by MutableTypedMap.of(ConcurrentHashMap()) {
+        @JvmInline
+        value class Key<V>(private val id: String) : TypedMap.Key<Context, V> {
+            companion object {
+                val INSTANCE = Key<RogueInstance>("rogue_instance")
+                val TARGET = Key<LivingEntity>("target")
+            }
         }
     }
 

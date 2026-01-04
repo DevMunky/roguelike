@@ -199,7 +199,7 @@ class Dungeon private constructor(
                     LOGGER.warn("Enemy '$enemyId' from pool '${enemyFeature.poolName}' does not exist.")
                     continue
                 }
-                val enemy = Enemy(enemyData, Source.DungeonRoom(this))
+                val enemy = enemyData.toEnemy(Source.DungeonRoom(this))
 
                 val normalX = enemyFeature.direction.normalX()
                 val normalZ = enemyFeature.direction.normalZ()
