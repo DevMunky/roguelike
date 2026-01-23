@@ -53,6 +53,7 @@ abstract class Enemy(val data: EnemyData, val source: Source) : EntityCreature(d
 
     sealed interface Source {
         data class DungeonRoom(val room: Dungeon.Room) : Source
+        data class Command(val stack: Throwable = Throwable()) : Source
         data object Stylo : Source
         data object WhyNot : Source
     }

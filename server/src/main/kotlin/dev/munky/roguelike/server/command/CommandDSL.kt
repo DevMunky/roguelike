@@ -5,6 +5,7 @@ import net.minestom.server.command.builder.ArgumentCallback
 import net.minestom.server.command.builder.Command
 import net.minestom.server.command.builder.CommandContext
 import net.minestom.server.command.builder.arguments.Argument
+import net.minestom.server.command.builder.suggestion.SuggestionCallback
 import net.minestom.server.entity.Player
 
 @DslMarker
@@ -12,20 +13,23 @@ annotation class CommandMarker
 
 @CommandMarker
 interface CommandBranch {
+
+    fun suggest(entry: SuggestionCallback)
+
     /**
      * Adds a literal argument named [name]
      */
-    fun add(name: String, block: CommandBranch.() -> Unit)
+    fun argument(name: String, block: CommandBranch.() -> Unit)
 
     /**
      * Adds all of [args]
      */
-    fun add(vararg args: Pair<Argument<*>, ArgumentCallback?>, block: CommandBranch.() -> Unit)
+    fun argument(vararg args: Pair<Argument<*>, ArgumentCallback?>, block: CommandBranch.() -> Unit)
 
     /**
      * Adds all of [args]
      */
-    fun add(vararg args: Argument<*>, block: CommandBranch.() -> Unit)
+    fun argument(vararg args: Argument<*>, block: CommandBranch.() -> Unit)
 
     /**
      * Creates an executor at the current point in the hierarchy.

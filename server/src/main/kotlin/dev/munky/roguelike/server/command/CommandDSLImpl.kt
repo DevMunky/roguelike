@@ -13,6 +13,7 @@ import net.minestom.server.command.builder.CommandContext
 import net.minestom.server.command.builder.CommandExecutor
 import net.minestom.server.command.builder.arguments.Argument
 import net.minestom.server.command.builder.arguments.ArgumentLiteral
+import net.minestom.server.command.builder.suggestion.SuggestionCallback
 import java.util.*
 import kotlin.collections.ArrayList
 
@@ -31,20 +32,20 @@ internal object CommandDSLImpl {
         val children = ArrayList<CommandBranchImpl>()
         var executor: CommandExecutor? = null
 
-        override fun add(name: String, block: CommandBranch.() -> Unit) {
+        override fun argument(name: String, block: CommandBranch.() -> Unit) {
             val branch = CommandBranchImpl(ArgumentLiteral(name))
             branch.block()
             children += branch
         }
 
-        override fun add(vararg args: Pair<Argument<*>, ArgumentCallback?>, block: CommandBranch.() -> Unit) {
+        override fun argument(vararg args: Pair<Argument<*>, ArgumentCallback?>, block: CommandBranch.() -> Unit) {
             val mapped = args.map { it.first.apply { callback = it.second } }.toTypedArray()
             val argBranch = CommandBranchImpl(*mapped)
             argBranch.block()
             children += argBranch
         }
 
-        override fun add(vararg args: Argument<*>, block: CommandBranch.() -> Unit) {
+        override fun argument(vararg args: Argument<*>, block: CommandBranch.() -> Unit) {
             val argBranch = CommandBranchImpl(*args)
             argBranch.block()
             children += argBranch
@@ -69,6 +70,9 @@ internal object CommandDSLImpl {
     }
 
     private class RootBranchImpl(val name: String): AbstractCommandBranch() {
+
+        override fun suggest(entry: SuggestionCallback) = throw UnsupportedOperationException("Cannot suggest on root command")
+
         fun build(): Command {
             val cmd = Command(name)
             for (child in children) {
@@ -85,6 +89,13 @@ internal object CommandDSLImpl {
 
     // Maybe change this to two separate arrays, one for arguments and one for the callbacks
     private class CommandBranchImpl(vararg val args: Argument<*>): AbstractCommandBranch() {
+
+        override fun suggest(entry: SuggestionCallback) {
+            for (argument in args) {
+                argument.suggestionCallback = entry
+            }
+        }
+
         override fun build(parent: Command) {
             if (executor != null) parent.addSyntax(executor ?: MISSING_EXECUTOR, *args)
             for (child in children) {

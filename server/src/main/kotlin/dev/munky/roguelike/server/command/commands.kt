@@ -5,7 +5,6 @@ import dev.munky.roguelike.common.renderdispatcherapi.RenderDispatch
 import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.asComponent
-import dev.munky.roguelike.server.enemy.Enemy
 import dev.munky.roguelike.server.enemy.Enemy.Source
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.Dungeon
@@ -17,6 +16,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import net.minestom.server.MinecraftServer
 import net.minestom.server.command.builder.arguments.ArgumentType
+import net.minestom.server.command.builder.suggestion.SuggestionEntry
 import net.minestom.server.coordinate.Pos
 import kotlin.math.PI
 import kotlin.random.Random
@@ -34,16 +34,23 @@ fun toggleDebug() = command("debug") {
     }
 }
 
+fun testDungeonRoom() = command("testDungeonRoom") {
+    argument("spawnEnemies") {
+
+    }
+}
+
 fun testEnemy() = command("testEnemy") {
     playerExecutor{ s, _ ->
         val origin = s.position
-        val data = Roguelike.server().enemies().toList().random()
         val radius = 20
+        val enemies = Roguelike.server().enemies().toList()
         val halfRadius = radius / 2
         repeat(5) {
+            val data = enemies.random()
             val x = origin.x + (Random.nextDouble() * radius - halfRadius).toInt()
             val z = origin.z + (Random.nextDouble() * radius - halfRadius).toInt()
-            val e = data.toEnemy(Source.WhyNot)
+            val e = data.toEnemy(Source.Command())
             e.setInstance(s.instance, Pos(x, origin.y, z))
         }
     }
@@ -88,7 +95,12 @@ fun testDropItem() = command("testDropItem") {
 }
 
 fun testDungeon() = command("testDungeon") {
-    add(ArgumentType.String("roomset_id")) {
+    argument(ArgumentType.String("roomset_id")) {
+        suggest { s, c, suggestion ->
+            for (set in Roguelike.server().roomSets()) {
+                suggestion.addEntry(SuggestionEntry(set.id))
+            }
+        }
         playerExecutor{ s, c ->
             s.sendMessage("testing dungeon")
             val roomsetId = c.get<String>("roomset_id")

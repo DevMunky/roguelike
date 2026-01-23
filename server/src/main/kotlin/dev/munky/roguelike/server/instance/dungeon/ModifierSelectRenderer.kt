@@ -81,7 +81,8 @@ object ModifierSelectRenderer : Renderer {
         }
 
         watchAndRequire(SelectedModifier) {
-            player.weaponData = player.weaponData.withModifier(it)
+            player.character = player.character.withWeapon(player.character.weapon.data.withModifier(it))
+            player.refreshLoadout()
             dispose()
         }
 

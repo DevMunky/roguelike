@@ -8,8 +8,10 @@ import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.interact.HoverableInteractableCreature
 import dev.munky.roguelike.server.interact.InteractableRegion
 import dev.munky.roguelike.server.interact.Region
+import dev.munky.roguelike.server.item.RogueItem
 import dev.munky.roguelike.server.item.WeaponData
 import dev.munky.roguelike.server.item.Weapon
+import dev.munky.roguelike.server.player.Character.Companion.WEAPON_SLOT
 import kotlinx.serialization.Serializable
 import net.minestom.server.entity.Player
 import net.minestom.server.entity.attribute.Attribute
@@ -37,18 +39,15 @@ class RoguePlayer(connection: PlayerConnection, profile: GameProfile) : Player(c
     val account = Roguelike.server().accounts()[uuid.toString()] ?: AccountData.new(this)
     var character = Character(account.characters.first())
 
-    var weaponData get() = character.weapon.data
-        set(value) {
-            character = character.copy(data = character.data.copy(weaponData = value))
-            refreshLoadout()
-        }
+    val hotbar = Array<RogueItem?>(9) { null }
 
     init {
         getAttribute(Attribute.ENTITY_INTERACTION_RANGE).addModifier(DEFAULT_ENTITY_INTERACTION_MODIFIER)
     }
 
     fun refreshLoadout() {
-        inventory.setItemStack(0, character.weapon.buildItemStack())
+        inventory.setItemStack(WEAPON_SLOT, character.weapon.createCustomItemStack())
+        hotbar[WEAPON_SLOT] = character.weapon
     }
 
     override fun spawn() {
@@ -103,4 +102,8 @@ data class Character(val data: CharacterData) {
     val weapon = Weapon(data.weaponData)
 
     fun withWeapon(weaponData: WeaponData) : Character = copy(data = data.copy(weaponData = weaponData))
+
+    companion object {
+        const val WEAPON_SLOT = 0
+    }
 }

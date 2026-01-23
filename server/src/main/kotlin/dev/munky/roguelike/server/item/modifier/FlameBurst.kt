@@ -3,9 +3,11 @@ package dev.munky.roguelike.server.item.modifier
 import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.item.AttackContext
 import dev.munky.roguelike.server.item.attack.command.InstantBurn
+import kotlinx.serialization.Serializable
 import net.minestom.server.component.DataComponents
 import net.minestom.server.item.ItemStack
 
+@Serializable
 data class FlameBurst(override val data: ModifierData) : Modifier {
     override fun decorateWeapon(ctx: ItemStack): ItemStack {
         val lore = ctx.get(DataComponents.LORE)?.let { ArrayList(it) } ?: arrayListOf()

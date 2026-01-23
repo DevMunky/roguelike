@@ -7,8 +7,6 @@ import dev.munky.roguelike.server.RenderKey
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.interact.HoverableInteractableCreature
 import dev.munky.roguelike.server.player.RoguePlayer
-import dev.munky.roguelike.server.raycast.Ray
-import net.minestom.server.coordinate.Point
 import net.minestom.server.coordinate.Vec
 import net.minestom.server.entity.Entity
 import net.minestom.server.entity.EntityType
@@ -52,7 +50,7 @@ class DroppedItem(val handle: RenderHandle, val player: RoguePlayer, val item: R
 
     val itemDisplay = Entity(EntityType.ITEM_DISPLAY).apply {
         editEntityMeta(ItemDisplayMeta::class.java) {
-            it.itemStack = item.buildItemStack()
+            it.itemStack = item.createCustomItemStack()
             it.posRotInterpolationDuration = 1
         }
         isAutoViewable = false
@@ -60,7 +58,7 @@ class DroppedItem(val handle: RenderHandle, val player: RoguePlayer, val item: R
     }
 
     override fun onInteract(player: RoguePlayer) {
-        player.inventory.addItemStack(item.buildItemStack())
+        player.inventory.addItemStack(item.createCustomItemStack())
         handle.dispose()
     }
 

@@ -6,6 +6,9 @@ import dev.munky.roguelike.server.Roguelike
 import dev.munky.roguelike.server.enemy.Enemy
 import dev.munky.roguelike.server.enemy.Enemy.Source
 import dev.munky.roguelike.server.instance.RogueInstance
+import dev.munky.roguelike.server.instance.dungeon.generator.BackTrackingGenerator
+import dev.munky.roguelike.server.instance.dungeon.generator.Generator
+import dev.munky.roguelike.server.instance.dungeon.generator.PlannedRoom
 import dev.munky.roguelike.server.instance.dungeon.roomset.ConnectionFeature
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomBlueprint
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomFeatures
@@ -70,6 +73,9 @@ class Dungeon private constructor(
         MinecraftServer.getInstanceManager().unregisterInstance(this)
     }
 
+    /**
+     * Generate, the rooms, then paste them in the world and initialize appropriately.
+     */
     private suspend fun initialize() {
         // place root room at origin
         val generator = BackTrackingGenerator(roomset, maxDepth = 50, seed = System.nanoTime(), debug = isDebug)
@@ -106,6 +112,9 @@ class Dungeon private constructor(
         return room
     }
 
+    /**
+     * Paste room in the world and initialize it, then reference connections appropriately.
+     */
     private suspend fun commitPlan(root: PlannedRoom): Room {
         // 1st pass: paste rooms
         val plannedToReal = IdentityHashMap<PlannedRoom, Room>()
@@ -156,6 +165,9 @@ class Dungeon private constructor(
          */
         val connections: MutableMap<ConnectionFeature, Room?>,
         val position: BlockVec,
+        /**
+         * The blocks this room occupies.
+         */
         override val region: Region
     ) : InteractableRegion, RenderContext.Element {
         private val instanceEventNode = EventNode.type("${dungeon.roomset.id}.${blueprint.id}.${position.x()}-${position.y()}-${position.z()}", EventFilter.ENTITY).apply {
@@ -168,6 +180,10 @@ class Dungeon private constructor(
                 room.enemyDeath(enemy)
             }
         }
+
+        /**
+         * The enemies physically in this room
+         */
         private var livingEnemies: HashSet<Enemy>? = null
 
         override val key: RenderContext.Key<*> = Companion
@@ -238,7 +254,7 @@ class Dungeon private constructor(
         suspend fun create(roomset: RoomSet, players: List<RoguePlayer>): Dungeon = Dungeon(roomset).apply {
             initialize()
             MinecraftServer.getInstanceManager().registerInstance(this)
-            if (players.all { it.isDebug }) isDebug = true
+            isDebug = players.all { it.isDebug }
             for (player in players) {
                 player.setInstance(this, Pos(.0, 110.0, .0))
             }

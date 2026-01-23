@@ -7,5 +7,5 @@
     "<blue>Test",
     "<green>Test"
   ],
-  "modifier_class": "dev.munky.roguelike.server.item.modifier.FlameBurstModifier"
+  "modifier_class": "dev.munky.roguelike.server.item.modifier.FlameBurst"
 }

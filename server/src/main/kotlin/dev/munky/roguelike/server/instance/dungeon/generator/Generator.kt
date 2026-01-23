@@ -1,4 +1,4 @@
-package dev.munky.roguelike.server.instance.dungeon
+package dev.munky.roguelike.server.instance.dungeon.generator
 
 import dev.munky.roguelike.common.logger
 import dev.munky.roguelike.server.instance.dungeon.roomset.ConnectionFeature
@@ -17,6 +17,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import java.util.LinkedList
 import java.util.TreeMap
+import kotlin.collections.iterator
 import kotlin.math.E
 import kotlin.math.max
 import kotlin.math.pow
@@ -37,6 +38,10 @@ interface Generator {
             TOO_SMALL,
         }
     }
+}
+
+abstract class AbstractGenerator : Generator {
+
 }
 
 data class PlannedRoom(

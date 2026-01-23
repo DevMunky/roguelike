@@ -28,13 +28,9 @@ class MainMenuInstance private constructor() : RogueInstance(UUID.randomUUID(), 
     }
 
     override fun onEnter(player: RoguePlayer) {
-        val fake = object: NpcPlayer("", null, null) {
-            override val conversation: Conversation = conversation("".asComponent()) {}
-        }
-        fake.setInstance(this, player.position)
         RenderDispatch.with(MainMenuRenderer)
             .with(player)
-            .dispatch()
+            .dispatchManaged()
     }
 
     companion object {

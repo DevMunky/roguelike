@@ -5,5 +5,5 @@
   "description": [
     "<red>Test2"
   ],
-  "modifier_class": "dev.munky.roguelike.server.item.modifier.FlameBurstModifier"
+  "modifier_class": "dev.munky.roguelike.server.item.modifier.FlameBurst"
 }
