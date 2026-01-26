@@ -1,14 +1,92 @@
 package dev.munky.roguelike.server.instance.dungeon.generator
 
-class Tree<T: Any> {
-    private val rootNode: Node? = null
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
+class Tree<T: Any>(
+    root: T,
+    map: ()->MutableMap<T, Node> = ::ConcurrentHashMap,
+) {
+    @PublishedApi
+    internal val nodes = map()
 
+    val root: Node
+
+    init {
+        require(nodes.isEmpty()) { "Map must be empty to create a new tree." }
+
+        this.root = Node(null, root, newChildrenSet())
+        nodes[root] = this.root
+    }
+
+    fun getNode(value: T): Node? = nodes[value]
+
+    /**
+     * Adds a new node as a child of [parent].
+     *
+     * @return the newly created child node.
+     */
+    fun addNode(parent: Node, child: T): Node = Node(parent, child, newChildrenSet()).also {
+        parent.children.add(it)
+        nodes[child] = it
+    }
+
+    /**
+     * Removes the node and all of its children recursively.
+     */
+    fun removeNode(node: Node) {
+        nodes.remove(node.value)
+        for (child in node.children)
+            removeNode(child)
+    }
+
+    fun <S : Any> map(transform: (parent: T?, value: T) -> S) : Tree<S> {
+        val newTree = Tree(transform(null, root.value))
+
+        for (child in root.children) {
+            recursiveMap(newTree, newTree.root, child, transform)
+        }
+
+        return newTree
+    }
+
+    private fun <S: Any> recursiveMap(tree: Tree<S>, parent: Tree<S>.Node, node: Node, transform: (T?, T)->S) {
+        val children = node.children
+        val newNode = tree.addNode(parent, transform(node.value, node.value))
+        for (child in children) {
+            val new = transform(node.value, child.value)
+            tree.addNode(newNode, new)
+            recursiveMap(tree, newNode, child, transform)
+        }
+    }
+
+    suspend fun <S : Any> mapAsync(transform: suspend T.(parent: T?) -> S) : Tree<S> {
+        val newTree = Tree(transform(root.value, null))
+
+        for (child in root.children) {
+            recursiveMapAsync(newTree, newTree.root, child, transform)
+        }
+
+        return newTree
+    }
+
+    private suspend fun <S: Any> recursiveMapAsync(tree: Tree<S>, parent: Tree<S>.Node, node: Node, transform: suspend T.(parent: T?) -> S) {
+        val children = node.children
+        val newNode = tree.addNode(parent, transform(node.value, node.parent?.value))
+        coroutineScope {
+            for (child in children) {
+                val new = transform(child.value, node.value)
+                tree.addNode(newNode, new)
+                launch { recursiveMapAsync(tree, newNode, child, transform) }
+            }
+        }
+    }
 
     inner class Node(
         val parent: Node?,
         val value: T,
-        val children: ArrayList<Node>
+        val children: MutableSet<Node>
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -20,5 +98,15 @@ class Tree<T: Any> {
         }
 
         override fun hashCode(): Int = value.hashCode()
+
+        override fun toString(): String = "Tree.Node(parent=${parent?.value}, value=$value, children=$children)"
+    }
+
+    companion object {
+
+        @Suppress("UNCHECKED_CAST")
+        fun <T: Any> empty() : Tree<T> = Tree(Unit as T)
+
+        private fun <T: Any> newChildrenSet() = ConcurrentHashMap.newKeySet<Tree<T>.Node>()
     }
 }

@@ -1,15 +1,21 @@
 package dev.munky.roguelike.server.instance.dungeon
 
+import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.common.logger
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
+import dev.munky.roguelike.common.sentenceCase
 import dev.munky.roguelike.server.Roguelike
+import dev.munky.roguelike.server.asComponent
 import dev.munky.roguelike.server.enemy.Enemy
 import dev.munky.roguelike.server.enemy.Enemy.Source
 import dev.munky.roguelike.server.instance.RogueInstance
-import dev.munky.roguelike.server.instance.dungeon.generator.BackTrackingGenerator
+import dev.munky.roguelike.server.instance.dungeon.generator.BacktrackingGenerator
+import dev.munky.roguelike.server.instance.dungeon.generator.CandidateSolver
+import dev.munky.roguelike.server.instance.dungeon.generator.GenerationOrchestrator
 import dev.munky.roguelike.server.instance.dungeon.generator.Generator
+import dev.munky.roguelike.server.instance.dungeon.generator.SpatialRegion
 import dev.munky.roguelike.server.instance.dungeon.generator.PlannedRoom
-import dev.munky.roguelike.server.instance.dungeon.roomset.ConnectionFeature
+import dev.munky.roguelike.server.instance.dungeon.generator.Tree
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomBlueprint
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomFeatures
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
@@ -18,6 +24,10 @@ import dev.munky.roguelike.server.interact.InteractableRegion
 import dev.munky.roguelike.server.interact.Region
 import dev.munky.roguelike.server.player.RoguePlayer
 import dev.munky.roguelike.server.util.ParticleUtil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import net.hollowcube.schem.util.Rotation
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.BlockVec
@@ -28,8 +38,6 @@ import net.minestom.server.event.EventNode
 import net.minestom.server.event.entity.EntityDeathEvent
 import net.minestom.server.instance.LightingChunk
 import net.minestom.server.particle.Particle
-import java.util.ArrayDeque
-import java.util.IdentityHashMap
 import java.util.UUID
 import kotlin.random.Random
 import kotlin.random.asJavaRandom
@@ -46,10 +54,9 @@ class Dungeon private constructor(
     }
 
     /**
-     * Null if this dungeon has not yet been generated.
+     * Null if this dungeon has not been generated.
      */
-    var rootRoom: Room? = null
-        private set
+    var rooms: Tree<Room>? = null
 
     override fun onEnter(player: RoguePlayer) {
         player.gameMode = GameMode.CREATIVE
@@ -67,7 +74,7 @@ class Dungeon private constructor(
     }
 
     private fun shutdown() {
-        rootRoom = null
+        rooms = null
         areas.clear()
         regionRenderHandles.forEach { map -> map.value.forEach { h -> h.value.dispose() } }
         MinecraftServer.getInstanceManager().unregisterInstance(this)
@@ -77,93 +84,56 @@ class Dungeon private constructor(
      * Generate, the rooms, then paste them in the world and initialize appropriately.
      */
     private suspend fun initialize() {
-        // place root room at origin
-        val generator = BackTrackingGenerator(roomset, maxDepth = 50, seed = System.nanoTime(), debug = isDebug)
-        try {
-            val plan = when (val generation = generator.plan()) {
-                Generator.Result.Failure.NO_POOL -> throw RuntimeException("No pool available.")
-                Generator.Result.Failure.EMPTY_POOL -> throw RuntimeException("A pool is empty.")
-                Generator.Result.Failure.DEPTH_EXCEEDED -> throw RuntimeException("Exceeded max depth.")
-                Generator.Result.Failure.NO_VALID_CONNECTION -> throw RuntimeException("No valid connection found.")
-                Generator.Result.Failure.TOO_SMALL -> throw RuntimeException("Dungeon too small.")
-                is Generator.Result.Success -> generation.room
-            }
+        val stats = Generator.Stats()
+        val spatial = SpatialRegion(stats = stats)
+        val candidateSolver = CandidateSolver(spatialRegion = spatial, stats = stats)
+        val orchestrator = GenerationOrchestrator(
+            roomset = roomset,
+            candidateSolver = candidateSolver,
+            random = Random(System.nanoTime()).asJavaRandom(),
+            generatorSupplier = ::BacktrackingGenerator
+        )
 
-            LOGGER.info("Commiting plan for roomset '${roomset.id}'.")
-            rootRoom = commitPlan(plan)
-
-            LOGGER.info("Done generating.")
-        } catch (t: Throwable) {
-            throw RuntimeException("Exception caught initializing dungeon.", t)
-        } finally {
-            LOGGER.debug("Generation planning stats = {}", generator.stats)
+        LOGGER.info("Generating roomset '${roomset.id}' for a dungeon.")
+        val planTree = when (val result = orchestrator.generate()) {
+            is dev.munky.roguelike.common.Result.Success -> result.value
+            is dev.munky.roguelike.common.Result.Failure -> throw RuntimeException("Generation failed unexpectedly: ${result.reason}")
         }
+
+        LOGGER.info("Committing plan for roomset '${roomset.id}'.")
+        rooms = commitPlan(planTree)
+        LOGGER.info("Done generating.")
     }
 
     private suspend fun createRoom(
         bp: RoomBlueprint,
-        connections: MutableMap<ConnectionFeature, Room?>,
         at: BlockVec,
         rotation: Rotation
     ): Room {
-        val features = bp.featuresWith(rotation)
-        val region = bp.paste(this@Dungeon, at, rotation)
-        val room = Room(this, bp, features, connections, at, region).also { areas += it }
+        val room = Room(
+            this,
+            bp,
+            bp.featuresWith(rotation),
+            at,
+            bp.paste(this, at, rotation)
+        ).also { areas += it }
         return room
     }
 
     /**
      * Paste room in the world and initialize it, then reference connections appropriately.
      */
-    private suspend fun commitPlan(root: PlannedRoom): Room {
-        // 1st pass: paste rooms
-        val plannedToReal = IdentityHashMap<PlannedRoom, Room>()
-        val stack = ArrayDeque<PlannedRoom>()
-        stack.add(root)
-        while (stack.isNotEmpty()) {
-            val pr = stack.removeLast()
-            if (plannedToReal.containsKey(pr)) continue
-
-            val connections = HashMap<ConnectionFeature, Room?>(pr.connections.size)
-            pr.blueprint.featuresWith(pr.rotation).connections.associateWithTo(connections) { null as Room? }
-
-            val room = createRoom(pr.blueprint, connections, pr.position, pr.rotation)
-            plannedToReal[pr] = room
-
-            // enqueue children
-            for (child in pr.connections.values) {
-                if (child != null) stack.add(child)
-            }
+    private suspend fun commitPlan(tree: Tree<PlannedRoom>): Tree<Room> {
+        val realTree = tree.mapAsync { _ ->
+            createRoom(blueprint, position, rotation)
         }
-
-        // 2nd pass: wire connections in both directions
-        for ((pr, real) in plannedToReal.entries) {
-            for ((c, child) in pr.connections) {
-                if (child != null) {
-                    val childReal = plannedToReal[child] ?: continue
-                    // Defensive: avoid self-referential connection which can cause recursion/stack overflows
-                    if (childReal === real) continue
-                    real.connections[c] = childReal
-                    // find reverse key in child
-                    val reverseKey = child.connections.entries.firstOrNull { it.value === pr }?.key
-                    if (reverseKey != null) {
-                        childReal.connections[reverseKey] = real
-                    }
-                }
-            }
-        }
-
-        return plannedToReal[root]!!
+        return realTree
     }
 
     data class Room(
         val dungeon: Dungeon,
         val blueprint: RoomBlueprint,
         val features: RoomFeatures,
-        /**
-         * The connections of this room in the world.
-         */
-        val connections: MutableMap<ConnectionFeature, Room?>,
         val position: BlockVec,
         /**
          * The blocks this room occupies.
@@ -181,6 +151,8 @@ class Dungeon private constructor(
             }
         }
 
+        private val players = ArrayList<RoguePlayer>()
+
         /**
          * The enemies physically in this room
          */
@@ -188,7 +160,26 @@ class Dungeon private constructor(
 
         override val key: RenderContext.Key<*> = Companion
         override val thickness: Double = 0.666
+
+        @Volatile
         var state = State.UNTOUCHED
+
+        private var tickingJob: Job? = null
+
+        private fun ensureTickingJobRunning() {
+            if (tickingJob != null) return
+            tickingJob = Dispatchers.Default.launch {
+                while (isActive) {
+                    delay(100)
+                    players.forEach { p -> p.sendActionBar("Inside of room ${blueprint.id}: ${state.name.lowercase().sentenceCase()}".asComponent()) }
+                }
+            }
+        }
+
+        private fun checkTickingJob() {
+            if (players.isNotEmpty() || tickingJob == null) return
+            tickingJob?.cancel()
+        }
 
         private fun enemyDeath(enemy: Enemy) {
             val living = livingEnemies ?: error("Enemy (${enemy.data}) killed before room '$this' livingEntities list is set.")
@@ -204,6 +195,11 @@ class Dungeon private constructor(
         }
 
         override fun onEnter(player: RoguePlayer) {
+            players += player
+            ensureTickingJobRunning()
+            if (state != State.UNTOUCHED) return
+            state = State.ENTERED
+
             val enemyFeatures = features.enemies
             val enemies = HashSet<Enemy>()
             for (enemyFeature in enemyFeatures) {
@@ -211,10 +207,12 @@ class Dungeon private constructor(
                     LOGGER.warn("Enemy feature $enemyFeature has an invalid pool '${enemyFeature.poolName}'.")
                     continue
                 }
+
                 val enemyData = Roguelike.server().enemies()[enemyId] ?: run {
                     LOGGER.warn("Enemy '$enemyId' from pool '${enemyFeature.poolName}' does not exist.")
                     continue
                 }
+
                 val enemy = enemyData.toEnemy(Source.DungeonRoom(this))
 
                 val normalX = enemyFeature.direction.normalX()
@@ -231,12 +229,11 @@ class Dungeon private constructor(
 
             livingEnemies = enemies
             EVENT_NODE.addChild(instanceEventNode)
-            state = State.ENTERED
-            player.sendMessage("Entered room ${blueprint.id}")
         }
 
         override fun onExit(player: RoguePlayer) {
-            player.sendMessage("Exited room ${blueprint.id}")
+            players -= player
+            checkTickingJob()
         }
 
         enum class State {

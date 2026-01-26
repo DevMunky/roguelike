@@ -1,9 +1,13 @@
 package dev.munky.roguelike.server.enemy.ai.behavior
 
 import dev.munky.roguelike.server.enemy.ai.Ai
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import net.minestom.server.entity.LivingEntity
 import net.minestom.server.entity.pathfinding.NavigableEntity
 
+@Serializable
+@SerialName("dash_towards_target")
 object DashTowardsTarget : AiBehavior {
     const val DASH_COOLDOWN_VALUE = 10.0
     val DASH_COOLDOWN = Ai.Context.Key<Double>("dash_cooldown")

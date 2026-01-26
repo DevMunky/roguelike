@@ -65,7 +65,7 @@ class RoguePlayer(connection: PlayerConnection, profile: GameProfile) : Player(c
             with(instance) {
                 RenderDispatch.with(DeathRenderer)
                     .with(this)
-                    .with(instance)
+                    .with(this@RoguePlayer)
                     .dispatchManaged()
             }
         }

@@ -1,0 +1,14 @@
+{
+  "id": "test_player",
+  "visual": {
+    "type": "player",
+    "username": ""
+  },
+  "movement": "WALKING",
+  "behaviors": [
+    { "type": "chase_target" },
+    { "type": "dash_towards_target" },
+    { "type": "melee_attack_target" },
+    { "type": "find_target" }
+  ]
+}

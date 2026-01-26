@@ -3,10 +3,16 @@ package dev.munky.roguelike.server
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.joran.JoranConfigurator
 import ch.qos.logback.core.joran.spi.JoranException
+import com.sun.management.OperatingSystemMXBean
+import com.sun.management.ThreadMXBean
 import dev.munky.modelrenderer.entity.ModelEntity
 import dev.munky.modelrenderer.skeleton.Model
+import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.server.instance.mainmenu.MainMenuInstance
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import net.kyori.adventure.bossbar.BossBar
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.Pos
@@ -20,6 +26,7 @@ import net.minestom.server.instance.Instance
 import org.joml.Vector3d
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.lang.management.ManagementFactory
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
@@ -53,12 +60,45 @@ suspend fun main(vararg args: String) {
     }
 
     var i = 0L
+    val bossBar = BossBar.bossBar("".asComponent(), 1f, BossBar.Color.BLUE, BossBar.Overlay.PROGRESS)
+    var bytesPerSecond = .0
+    Dispatchers.Default.launch {
+        val mxBean = ManagementFactory.getThreadMXBean() as ThreadMXBean
+        mxBean.isThreadAllocatedMemoryEnabled = true
+
+        var lastBytes = 0L
+        var lastTime = System.nanoTime()
+
+        while (isActive) {
+            delay(100)
+
+            var nowBytes = 0L
+            for (id in mxBean.allThreadIds) {
+                val threadBytes = mxBean.getThreadAllocatedBytes(id)
+                if (threadBytes == -1L) continue
+                nowBytes += threadBytes
+            }
+
+            val nowTime = System.nanoTime()
+            val deltaSeconds = (nowTime - lastTime) / 1_000_000_000.0
+            val deltaBytes = nowBytes - lastBytes
+            bytesPerSecond = deltaBytes / deltaSeconds
+
+            lastTime = nowTime
+            lastBytes = nowBytes
+        }
+    }
+
     MinecraftServer.getGlobalEventHandler().addListener(ServerTickMonitorEvent::class.java) {
         if (++i % 5 != 0L) return@addListener
         val mspt = String.format("%.2f", it.tickMonitor.tickTime)
-        val ram = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1_000_000.0
+        val ram = ManagementFactory.getMemoryMXBean().heapMemoryUsage.used / 1_000_000.0
+        val cpu = (ManagementFactory.getOperatingSystemMXBean() as OperatingSystemMXBean).processCpuLoad
+        val mbps = bytesPerSecond / 1024 / 1024
         for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
-            player.sendActionBar("<white>MSPT = $mspt, RAM = ${String.format("%.2f", ram)}MB".asComponent())
+            bossBar.name("<white>MB/s = ${String.format("%.2f", mbps)}, CPU = ${String.format("%.2f%%", cpu*100)}, MSPT = $mspt, RAM = ${String.format("%.2f", ram)}MB".asComponent())
+            bossBar.progress((it.tickMonitor.tickTime.toFloat() / 50f).coerceIn(0f, 1f))
+            player.showBossBar(bossBar)
         }
     }
 

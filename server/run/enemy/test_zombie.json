@@ -1,5 +1,5 @@
 {
-  "id": "test",
+  "id": "test_zombie",
   "visual": {
     "type": "vanilla",
     "entity_type": "minecraft:zombie"

@@ -31,7 +31,7 @@ object MeleeAttackTarget : AiBehavior {
         val target = context[Ai.Context.Key.TARGET] ?: return
         val instance = context[Ai.Context.Key.INSTANCE] ?: return
 
-        while (!target.isDead && target.instance == entity.instance) {
+        while (!target.isDead && !entity.isDead && target.instance == entity.instance) {
             entity.lookAt(target)
             instance.sendGroupedPacket(ParticlePacket(
                 Particle.ELECTRIC_SPARK, entity.position, entity.boundingBox.relativeEnd.div(1.5), 0.05f, 6
@@ -39,6 +39,7 @@ object MeleeAttackTarget : AiBehavior {
             delay(400) // telegraph
 
             // TODO stat stuff
+            entity.swingMainHand()
             target.damage(Damage.fromEntity(entity, 2f))
             instance.sendGroupedPacket(ParticlePacket(
                 Particle.CRIT, target.position, entity.boundingBox.relativeEnd.div(2.0), 0.5f, 20

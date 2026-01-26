@@ -67,6 +67,8 @@ data class Pool (
     val entries: WeightedRandomList<String>,
     val connectedPools: List<String>
 ) {
+    fun isConnected(other: Pool) = connectedPools.contains(other.id) || other.connectedPools.contains(id)
+
     companion object {
         fun of(roomSet: RoomSet, id: String, data: PoolData) : Pool {
             val connections = arrayListOf(id)
@@ -101,17 +103,17 @@ data class Pool (
 }
 
 data class RoomFeatures(
-    val connections: List<ConnectionFeature>,
-    val enemies: List<EnemyFeature>
+    val connections: Set<ConnectionFeature>,
+    val enemies: Set<EnemyFeature>
 ) {
     companion object {
-        val EMPTY = RoomFeatures(emptyList(), emptyList())
+        val EMPTY = RoomFeatures(emptySet(), emptySet())
     }
 }
 
 sealed class RoomBlueprint(
     val id: String,
-    val parent: RoomSet,
+    val roomset: RoomSet,
     val data: RoomData,
 ) {
     protected val featureCache = EnumMap<Rotation, RoomFeatures>(Rotation::class.java)
@@ -123,7 +125,7 @@ sealed class RoomBlueprint(
 
     abstract suspend fun initialize()
 
-    fun regionAt(at: Point, rotation: Rotation) : Region.Cuboid {
+    fun boundsAt(at: Point, rotation: Rotation) : Region.Cuboid {
         val r = regionCache.getOrPut(rotation) { computeRegion(rotation) }
         return r.offset(at.toJoml()) as Region.Cuboid
     }
@@ -144,7 +146,7 @@ sealed class RoomBlueprint(
      * Returns the area of this room post-rotation.
      */
     suspend fun paste(instance: Instance, at: Point, rotation: Rotation = Rotation.NONE) : Region.Cuboid {
-        val area = regionAt(at, rotation)
+        val area = boundsAt(at, rotation)
         val min = area.min
 
         val chunks = area.containedChunks()
@@ -185,7 +187,7 @@ sealed class RoomBlueprint(
             EnemyFeature.ID -> EnemyFeature(
                 name = name,
                 poolName = pool,
-                pool = parent.pools[pool],
+                pool = roomset.pools[pool],
                 finalBlock = finalBlock,
                 position = offsetFromCenter,
                 direction = dir
@@ -193,7 +195,7 @@ sealed class RoomBlueprint(
             else -> ConnectionFeature(
                 name = name,
                 poolName = pool,
-                pool = parent.pools[pool],
+                pool = roomset.pools[pool],
                 finalBlock = finalBlock,
                 position = offsetFromCenter,
                 direction = dir
@@ -275,8 +277,8 @@ private class NormalRoomBlueprint(
         if (structure.blocks.isEmpty()) return RoomFeatures.EMPTY
         val palette = structure.palettes.firstOrNull() ?: return RoomFeatures.EMPTY
 
-        val connections = ArrayList<ConnectionFeature>()
-        val enemies = ArrayList<EnemyFeature>()
+        val connections = HashSet<ConnectionFeature>()
+        val enemies = HashSet<EnemyFeature>()
 
         for (bi in structure.blocks) {
             val block = palette[bi.paletteIndex]

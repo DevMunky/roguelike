@@ -30,7 +30,8 @@ interface Region {
     fun offset(p: Vector3dc): Region
 
     fun expand(amount: Double): Region
-    fun contains(p: Vector3dc): Boolean
+    fun contains(x: Double, y: Double, z: Double): Boolean
+    fun contains(p: Vector3dc): Boolean = contains(p.x(), p.y(), p.z())
 
     /**
      * Check whether this shape intersects with another shape.
@@ -71,20 +72,26 @@ interface Region {
     }
 
     data class Sphere(val center: Vector3dc, val radius: Double) : Region {
-        override fun expand(amount: Double): Region = copy(radius = radius + amount)
-
-        override fun contains(p: Vector3dc): Boolean {
-            val off = p.sub(center, Vector3d())
-            return off.lengthSquared() <= radius * radius
-        }
-
-        override fun offset(p: Vector3dc): Region = Sphere(center.add(p, Vector3d()), radius)
+        private var chunkCache: LongArray? = null
 
         override val boundingBox: Cuboid by lazy {
             val r = radius
             val min = Vector3d(center).sub(r, r, r)
             val max = Vector3d(center).add(r, r, r)
             Cuboid(min, max)
+        }
+
+        override fun containedChunks(): LongArray {
+            return chunkCache ?: super.containedChunks().also { chunkCache = it }
+        }
+
+        override fun expand(amount: Double): Region = copy(radius = radius + amount)
+
+        override fun offset(p: Vector3dc): Region = Sphere(center.add(p, Vector3d()), radius)
+
+        override fun contains(x: Double, y: Double, z: Double): Boolean {
+            val off = Vector3d(x, y, z).sub(center)
+            return off.lengthSquared() <= radius * radius
         }
 
         override fun intersects(other: Region): Boolean = when (other) {
@@ -133,10 +140,10 @@ interface Region {
             max = max.add(amount, amount, amount, Vector3d())
         )
 
-        override fun contains(p: Vector3dc): Boolean {
-            if (p.x() < min.x() || p.x() > max.x()) return false
-            if (p.y() < min.y() || p.y() > max.y()) return false
-            if (p.z() < min.z() || p.z() > max.z()) return false
+        override fun contains(x: Double, y: Double, z: Double): Boolean {
+            if (x < min.x() || x > max.x()) return false
+            if (y < min.y() || y > max.y()) return false
+            if (z < min.z() || z > max.z()) return false
             return true
         }
 
@@ -252,15 +259,18 @@ interface InteractableRegion {
             Dispatchers.Default.launch {
                 // spheres are memory intense
                 val sphereCache = HashMap<Region, Pair<IcoSphere, IcoSphere>>()
+                val step = 4
+                val delay = 20L
+
                 while (isActive) {
-                    delay(50)
+                    delay(delay)
                     for (instance in MinecraftServer.getInstanceManager().instances) {
                         val container = instance as? InteractableRegionContainer ?: continue
                         val areas = synchronized(container.areas) {
                             container.areas.toList()
                         }
                         for (a in areas) {
-                            delay(50)
+                            delay(delay)
                             val shape = a.region
                             val innerParticle = Particle.DUST.withColor(Color(200, 0, 0))
                             val outerParticle = Particle.DUST.withColor(Color(0, 0, 200))
@@ -270,7 +280,6 @@ interface InteractableRegion {
                             }
                             when (shape) {
                                 is Region.Cuboid -> {
-                                    val step = 10
                                     fun drawCuboid(p: Particle, region: Region.Cuboid) {
                                         val ys = (region.max.y() - region.min.y()) / step
                                         var y = region.min.y()
