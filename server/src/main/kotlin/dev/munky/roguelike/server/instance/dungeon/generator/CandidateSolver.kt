@@ -86,7 +86,7 @@ open class CandidateSolver(
     ) : CandidateResult? {
         stats?.candidatesTried++
         val pos = owner.computeCandidatePosition(hostConnection, childConnection)
-        val region = blueprint.boundsAt(pos, rotation)
+        val region = blueprint.boundsWith(pos, rotation)
         val slightlySmallerBounds = region.expand(-0.05)
 
         if (!spatialRegion.isInHeightBounds(slightlySmallerBounds)) {
@@ -112,7 +112,7 @@ open class CandidateSolver(
         val blueprint: RoomBlueprint,
         val position: BlockVec,
         val rotation: Rotation,
-        val bounds: Region = blueprint.boundsAt(position, rotation),
+        val bounds: Region = blueprint.boundsWith(position, rotation),
 
         val weight: Double,
         val connectedToParentVia: ConnectionFeature

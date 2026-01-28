@@ -108,22 +108,49 @@ data class Pool (
     }
 }
 
-data class RoomFeatures(
-    val connections: Set<ConnectionFeature>,
-    val enemies: Set<EnemyFeature>
+/**
+ * The features of a room.
+ *
+ * @see RoomBlueprint.featuresWith
+ * @see ConnectionFeature
+ * @see EnemyFeature
+ */
+class RoomFeatures(
+    val connections: Array<ConnectionFeature>,
+    val enemies: Array<EnemyFeature>
 ) {
     companion object {
-        val EMPTY = RoomFeatures(emptySet(), emptySet())
+        val EMPTY = RoomFeatures(emptyArray(), emptyArray())
     }
 }
 
+/**
+ * A blueprint for a room derived from a roomset file and its referenced structure file.
+ *
+ * Contains many utilities for generating rooms and getting details about them,
+ * like where connections are and enemies that spawn in them.
+ *
+ * @see featuresWith
+ * @see boundsWith
+ */
 sealed class RoomBlueprint(
     val id: String,
     val roomset: RoomSet,
     val data: RoomData,
 ) {
-    protected val featureCache = EnumMap<Rotation, RoomFeatures>(Rotation::class.java)
-    protected val regionCache = EnumMap<Rotation, Region.Cuboid>(Rotation::class.java)
+    /**
+     * Must not be accessed before [initialized][initialize].
+     */
+    protected lateinit var featureCache: Array<RoomFeatures>
+
+    /**
+     * Must not be accessed before [initialized][initialize].
+     */
+    protected lateinit var regionCache: Array<Region.Cuboid>
+
+    /**
+     * Must not be accessed before [initialized][initialize].
+     */
     var isTerminal: Boolean = false
         private set
 
@@ -131,6 +158,9 @@ sealed class RoomBlueprint(
 
     protected abstract val size: Point
 
+    /**
+     * Sets blocks for this room at a position and does __not__ load chunks.
+     */
     protected abstract suspend fun setBlocksUnsafe(
         instance: Instance,
         x: Double,
@@ -139,39 +169,36 @@ sealed class RoomBlueprint(
         rotation: Rotation,
         override: Block? = null
     )
+
+    /**
+     * Not in a hot path, as results are cached.
+     *
+     * @see featureCache
+     * @see featuresWith
+     */
     protected abstract fun computeFeaturesWith(rotation: Rotation) : RoomFeatures
 
     suspend fun initialize() {
         initialize0()
-        computeFeaturesWith(Rotation.NONE)
+        // compute caches
+        featureCache = Array(Rotation.entries.size) { computeFeaturesWith(Rotation.entries[it]) }
+        regionCache = Array(Rotation.entries.size) { computeRegion(Rotation.entries[it]) }
+
         isTerminal = featuresWith(Rotation.NONE).connections.size <= 1
     }
 
     protected abstract suspend fun initialize0()
 
-    fun boundsAt(at: Point, rotation: Rotation) : Region.Cuboid {
-        val r = regionCache.getOrPut(rotation) { computeRegion(rotation) }
-        return r.offset(at.toJoml()) as Region.Cuboid
-    }
+    fun boundsWith(position: Point, rotation: Rotation) : Region.Cuboid =
+        regionCache[rotation.ordinal].offset(position.toJoml()) as Region.Cuboid
 
-    fun featuresWith(rotation: Rotation) : RoomFeatures {
-        featureCache[rotation]?.let {
-            return it
-        }
-
-        val result = computeFeaturesWith(rotation)
-        if (result.connections.size <= 1) isTerminal = true
-
-        // Cache to avoid recomputing
-        featureCache[rotation] = result
-        return result
-    }
+    fun featuresWith(rotation: Rotation) : RoomFeatures = featureCache[rotation.ordinal]
 
     /**
      * Returns the area of this room post-rotation.
      */
     suspend fun paste(instance: Instance, at: Point, rotation: Rotation = Rotation.NONE, override: Block? = null) : Region.Cuboid {
-        val area = boundsAt(at, rotation)
+        val area = boundsWith(at, rotation)
         val min = area.min
 
         val chunks = area.containedChunks()
@@ -302,9 +329,8 @@ private class NormalRoomBlueprint(
         if (structure.blocks.isEmpty()) return RoomFeatures.EMPTY
         val palette = structure.palettes.firstOrNull() ?: return RoomFeatures.EMPTY
 
-        // For iteration speed, CandidateSolver's bottleneck is iteration time.
-        val connections = LinkedHashSet<ConnectionFeature>()
-        val enemies = LinkedHashSet<EnemyFeature>()
+        val connections = ArrayList<ConnectionFeature>()
+        val enemies = ArrayList<EnemyFeature>()
 
         for (bi in structure.blocks) {
             val block = palette[bi.paletteIndex]
@@ -319,7 +345,7 @@ private class NormalRoomBlueprint(
             }
         }
 
-        return RoomFeatures(connections, enemies)
+        return RoomFeatures(connections.toTypedArray(), enemies.toTypedArray())
     }
 
     /**

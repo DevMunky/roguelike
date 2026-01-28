@@ -18,8 +18,6 @@ import kotlinx.coroutines.runBlocking
 import net.minestom.server.coordinate.CoordConversion
 import net.minestom.server.instance.Instance
 import net.minestom.server.instance.block.Block
-import org.joml.Vector3d
-import org.joml.Vector3i
 import java.util.Random
 import kotlin.math.roundToInt
 import kotlin.time.Duration
@@ -266,7 +264,7 @@ class GenerationDebug(
 
             //room.blueprint.paste(dungeon, room.position, room.rotation, Block.AIR)
 
-            val bounds = room.blueprint.boundsAt(room.position, room.rotation).expand(1.0).boundingBox
+            val bounds = room.blueprint.boundsWith(room.position, room.rotation).expand(1.0).boundingBox
             for (x in bounds.min.x().roundToInt()..bounds.max.x().roundToInt())
                 for (z in bounds.min.z().roundToInt()..bounds.max.z().roundToInt())
                     for (y in bounds.min.y().roundToInt()..bounds.max.y().roundToInt()) {
@@ -395,7 +393,7 @@ open class GenerationOrchestrator(
 
         // Commiting the root room with any other rotation does not align the bounds correctly.
         val rotation = Rotation.CLOCKWISE_90
-        val bounds = blueprint.boundsAt(startPosition, rotation)
+        val bounds = blueprint.boundsWith(startPosition, rotation)
 
         return PlannedRoom(
             blueprint = blueprint,
@@ -410,7 +408,7 @@ data class PlannedRoom(
     val blueprint: RoomBlueprint,
     val position: BlockVec,
     val rotation: Rotation,
-    val bounds: Region = blueprint.boundsAt(position, rotation),
+    val bounds: Region = blueprint.boundsWith(position, rotation),
     val connectedToParentVia: ConnectionFeature? = null
 ) {
     val connections: Connections = Connections()
