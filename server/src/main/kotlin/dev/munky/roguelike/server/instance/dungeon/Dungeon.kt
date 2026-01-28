@@ -1,5 +1,6 @@
 package dev.munky.roguelike.server.instance.dungeon
 
+import dev.munky.roguelike.common.handleFailure
 import dev.munky.roguelike.common.launch
 import dev.munky.roguelike.common.logger
 import dev.munky.roguelike.common.renderdispatcherapi.RenderContext
@@ -11,6 +12,7 @@ import dev.munky.roguelike.server.enemy.Enemy.Source
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.generator.BacktrackingGenerator
 import dev.munky.roguelike.server.instance.dungeon.generator.CandidateSolver
+import dev.munky.roguelike.server.instance.dungeon.generator.GenerationDebug
 import dev.munky.roguelike.server.instance.dungeon.generator.GenerationOrchestrator
 import dev.munky.roguelike.server.instance.dungeon.generator.Generator
 import dev.munky.roguelike.server.instance.dungeon.generator.SpatialRegion
@@ -85,27 +87,33 @@ class Dungeon private constructor(
      */
     private suspend fun initialize() {
         val stats = Generator.Stats()
-        val spatial = SpatialRegion(stats = stats)
-        val candidateSolver = CandidateSolver(spatialRegion = spatial, stats = stats)
+        val debug = GenerationDebug(this)
         val orchestrator = GenerationOrchestrator(
+            //debug = debug,
             roomset = roomset,
-            candidateSolver = candidateSolver,
             random = Random(System.nanoTime()).asJavaRandom(),
-            generatorSupplier = ::BacktrackingGenerator
+            generatorSupplier = ::BacktrackingGenerator,
+            stats = stats
         )
 
         LOGGER.info("Generating roomset '${roomset.id}' for a dungeon.")
-        val planTree = when (val result = orchestrator.generate()) {
-            is dev.munky.roguelike.common.Result.Success -> result.value
-            is dev.munky.roguelike.common.Result.Failure -> throw RuntimeException("Generation failed unexpectedly: ${result.reason}")
+
+        val planTree = orchestrator.generate().handleFailure {
+            throw RuntimeException("Generation failed unexpectedly: $it")
         }
 
         LOGGER.info("Committing plan for roomset '${roomset.id}'.")
+        for (chunk in chunks) {
+            chunk.reset()
+            chunk.sendChunk()
+        }
+        // time for packets to arrive.
+        delay(50)
         rooms = commitPlan(planTree)
         LOGGER.info("Done generating.")
     }
 
-    private suspend fun createRoom(
+    suspend fun createRoom(
         bp: RoomBlueprint,
         at: BlockVec,
         rotation: Rotation
@@ -171,7 +179,13 @@ class Dungeon private constructor(
             tickingJob = Dispatchers.Default.launch {
                 while (isActive) {
                     delay(100)
-                    players.forEach { p -> p.sendActionBar("Inside of room ${blueprint.id}: ${state.name.lowercase().sentenceCase()}".asComponent()) }
+                    for (player in players.toList()) {
+                        if (player !in dungeon.players) {
+                            players.remove(player)
+                        }
+                        player.sendActionBar("Inside of room ${blueprint.id}: ${state.name.lowercase().sentenceCase()}".asComponent())
+                    }
+                    checkTickingJob()
                 }
             }
         }
@@ -179,6 +193,7 @@ class Dungeon private constructor(
         private fun checkTickingJob() {
             if (players.isNotEmpty() || tickingJob == null) return
             tickingJob?.cancel()
+            tickingJob = null
         }
 
         private fun enemyDeath(enemy: Enemy) {
@@ -249,12 +264,12 @@ class Dungeon private constructor(
         private val LOGGER = logger {}
 
         suspend fun create(roomset: RoomSet, players: List<RoguePlayer>): Dungeon = Dungeon(roomset).apply {
-            initialize()
             MinecraftServer.getInstanceManager().registerInstance(this)
             isDebug = players.all { it.isDebug }
             for (player in players) {
                 player.setInstance(this, Pos(.0, 110.0, .0))
             }
+            initialize()
         }
     }
 }

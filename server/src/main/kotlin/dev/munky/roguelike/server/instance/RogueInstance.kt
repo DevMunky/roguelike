@@ -19,6 +19,7 @@ import net.minestom.server.instance.InstanceContainer
 import net.minestom.server.registry.RegistryKey
 import net.minestom.server.world.DimensionType
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 abstract class RogueInstance(
     uuid: UUID,
@@ -26,7 +27,7 @@ abstract class RogueInstance(
 ) : InstanceContainer(uuid, dimensionType), InteractableRegionContainer, RenderContext.Element, RenderHandleManager {
     final override val key: RenderContext.Key<*> = Companion
 
-    override val areas: HashSet<InteractableRegion> = HashSet()
+    override val areas: MutableSet<InteractableRegion> = ConcurrentHashMap.newKeySet()
     val regionRenderHandles = HashMap<RoguePlayer, HashMap<Renderer, RenderHandle>>()
 
     override fun createArea(b: InteractableRegion.Dsl.() -> Unit) {

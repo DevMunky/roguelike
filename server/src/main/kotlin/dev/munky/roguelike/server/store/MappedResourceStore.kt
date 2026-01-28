@@ -44,6 +44,8 @@ open class MappedResourceStore<S: Any, T: Any>(
             LOGGER.warn("No files found for '${id()}'.")
             return
         }
+        this@MappedResourceStore.decodedFiles.clear()
+        this@MappedResourceStore.entries.clear()
         val tasks = ArrayList<Job>()
         for (file in files) tasks += (CoroutineName("decoding file '${file.path}'") + decodeContext).launch {
             val bytes = file.inputStream().use {

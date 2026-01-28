@@ -44,13 +44,19 @@ class RoomSet private constructor(val data: RoomSetData) {
     }
 
     private suspend fun createRooms() : Map<String, NormalRoomBlueprint> = coroutineScope {
-        LinkedHashMap<String, NormalRoomBlueprint>().apply {
+        var hasTerminal = false
+        val jobs = arrayListOf<Job>()
+        val map = LinkedHashMap<String, NormalRoomBlueprint>().apply {
             for (room in data.rooms) {
                 val room = NormalRoomBlueprint(room.key, this@RoomSet, room.value)
                 set(room.id, room)
-                launch { room.initialize() }
+                jobs += launch { room.initialize() }
             }
         }
+        jobs.joinAll()
+        for (room in map.values) hasTerminal = hasTerminal || room.isTerminal
+        if (!hasTerminal) error("Roomset must have at least one terminal room (a room with only one connection).")
+        map
     }
 
     companion object {
@@ -118,12 +124,30 @@ sealed class RoomBlueprint(
 ) {
     protected val featureCache = EnumMap<Rotation, RoomFeatures>(Rotation::class.java)
     protected val regionCache = EnumMap<Rotation, Region.Cuboid>(Rotation::class.java)
+    var isTerminal: Boolean = false
+        private set
+
+    val isRoot = id == roomset.rootRoomId
 
     protected abstract val size: Point
-    protected abstract suspend fun setBlocksUnsafe(instance: Instance, x: Double, y: Double, z: Double, rotation: Rotation)
+
+    protected abstract suspend fun setBlocksUnsafe(
+        instance: Instance,
+        x: Double,
+        y: Double,
+        z: Double,
+        rotation: Rotation,
+        override: Block? = null
+    )
     protected abstract fun computeFeaturesWith(rotation: Rotation) : RoomFeatures
 
-    abstract suspend fun initialize()
+    suspend fun initialize() {
+        initialize0()
+        computeFeaturesWith(Rotation.NONE)
+        isTerminal = featuresWith(Rotation.NONE).connections.size <= 1
+    }
+
+    protected abstract suspend fun initialize0()
 
     fun boundsAt(at: Point, rotation: Rotation) : Region.Cuboid {
         val r = regionCache.getOrPut(rotation) { computeRegion(rotation) }
@@ -136,6 +160,7 @@ sealed class RoomBlueprint(
         }
 
         val result = computeFeaturesWith(rotation)
+        if (result.connections.size <= 1) isTerminal = true
 
         // Cache to avoid recomputing
         featureCache[rotation] = result
@@ -145,7 +170,7 @@ sealed class RoomBlueprint(
     /**
      * Returns the area of this room post-rotation.
      */
-    suspend fun paste(instance: Instance, at: Point, rotation: Rotation = Rotation.NONE) : Region.Cuboid {
+    suspend fun paste(instance: Instance, at: Point, rotation: Rotation = Rotation.NONE, override: Block? = null) : Region.Cuboid {
         val area = boundsAt(at, rotation)
         val min = area.min
 
@@ -157,7 +182,7 @@ sealed class RoomBlueprint(
         ).asDeferred()
         tasks.joinAll()
 
-        setBlocksUnsafe(instance, min.x(), min.y(), min.z(), rotation)
+        setBlocksUnsafe(instance, min.x(), min.y(), min.z(), rotation, null)
         return area
     }
 
@@ -265,7 +290,7 @@ private class NormalRoomBlueprint(
     private var structure: Structure = Structure(Vec.ZERO, emptyList(), emptyList(), emptyList())
     override val size: Point get() = structure.size
 
-    override suspend fun initialize() {
+    override suspend fun initialize0() {
         try {
             structure = Roguelike.server().structures()[id] ?: error("No structure named '$id' found.")
         } catch (t: Throwable) {
@@ -277,8 +302,9 @@ private class NormalRoomBlueprint(
         if (structure.blocks.isEmpty()) return RoomFeatures.EMPTY
         val palette = structure.palettes.firstOrNull() ?: return RoomFeatures.EMPTY
 
-        val connections = HashSet<ConnectionFeature>()
-        val enemies = HashSet<EnemyFeature>()
+        // For iteration speed, CandidateSolver's bottleneck is iteration time.
+        val connections = LinkedHashSet<ConnectionFeature>()
+        val enemies = LinkedHashSet<EnemyFeature>()
 
         for (bi in structure.blocks) {
             val block = palette[bi.paletteIndex]
@@ -299,7 +325,14 @@ private class NormalRoomBlueprint(
     /**
      * Does not load chunks, ensure chunks are loaded before calling.
      */
-    override suspend fun setBlocksUnsafe(instance: Instance, x: Double, y: Double, z: Double, rotation: Rotation) {
+    override suspend fun setBlocksUnsafe(
+        instance: Instance,
+        x: Double,
+        y: Double,
+        z: Double,
+        rotation: Rotation,
+        override: Block?
+    ) {
         val blockMgr = MinecraftServer.getBlockManager()
         val changedChunks = HashSet<Chunk>()
         withContext(Dispatchers.IO) {
@@ -310,6 +343,7 @@ private class NormalRoomBlueprint(
             var first = true
             for (bi in structure.blocks) {
                 block = palette[bi.paletteIndex]
+                // Debug: Diamond block is the first block
                 if (first) {
                     first = false
                     block = Block.DIAMOND_BLOCK
@@ -332,6 +366,8 @@ private class NormalRoomBlueprint(
                 val localRot = rotateAboutCenter(bi.pos, rotation)
                 val pos: Point = localRot.add(x, y, z)
                 block = block.rotate(rotation)
+
+                if (override != null) block = override
 
                 val cx = CoordConversion.globalToChunk(pos.x())
                 val cz = CoordConversion.globalToChunk(pos.z())

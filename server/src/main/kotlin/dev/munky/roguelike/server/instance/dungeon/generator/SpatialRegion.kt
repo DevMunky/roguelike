@@ -4,6 +4,7 @@ import dev.munky.roguelike.server.interact.Region
 import java.util.Collections
 import java.util.LinkedList
 import java.util.TreeMap
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.iterator
 
 open class SpatialRegion(
@@ -12,22 +13,15 @@ open class SpatialRegion(
     private val stats: Generator.Stats? = null,
 ) {
     // Transient spatial index: chunk index -> regions residing in that chunk
-    private val bin = Collections.synchronizedSortedMap(TreeMap<Long, LinkedList<Region>>())
-
-    fun createSnapshot() : Snapshot {
-        val map = LinkedHashMap<Long, LinkedList<Region>>(bin.size)
-        for ((k, v) in bin) map[k] = LinkedList(v)
-        return Snapshot(map)
-    }
+    private val bin = HashMap<Long, LinkedList<Region>>()
 
     fun isIntersecting(
-        chunks: LongArray,
-        candidate: Region,
-        snapshot: Snapshot
+        candidate: Region
     ): Boolean {
+        val chunks = candidate.containedChunks()
         stats?.chunksChecked += chunks.size
         for (c in chunks) {
-            val possible = snapshot[c] ?: continue
+            val possible = bin[c] ?: continue
             for (r in possible) {
                 stats?.intersectionsChecked++
                 if (r.intersectsAabb(candidate)) {
@@ -44,7 +38,9 @@ open class SpatialRegion(
         val bb = area.boundingBox
         val regionMinY = bb.min.y()
         val regionMaxY = bb.max.y()
-        return regionMinY >= minY && maxY >= regionMaxY
+        val inBounds = (regionMinY >= minY && maxY >= regionMaxY)
+        if (!inBounds) stats?.heightBoundsFails++
+        return inBounds
     }
 
     fun index(bounds: Region) {
@@ -62,7 +58,4 @@ open class SpatialRegion(
     fun ensureReady() {
         bin.clear()
     }
-
-    @JvmInline
-    value class Snapshot(private val map: Map<Long, LinkedList<Region>>) : Map<Long, LinkedList<Region>> by map
 }

@@ -15,20 +15,22 @@ sealed interface Result<S, F> {
     companion object {
         fun <S, F> success(value: S) = Success<S, F>(value)
         fun <S, F> failure(reason: F) = Failure<S, F>(reason)
-
-        /**
-         * Inlined to reduce lambda allocations.
-         */
-        private inline fun <S, SS, F, FF> xmap(result: Result<S, F>, success: (S) -> SS, failure: (F) -> FF): Result<SS, FF> = when (result) {
-            is Success -> Success(success(result.value))
-            is Failure -> Failure(failure(result.reason))
-        }
     }
 }
 
 inline fun <S, F, T> Result<S, F>.mapSuccess(transform: (S) -> T): Result<T, F> = xmap(transform) { it }
 
 inline fun <S, F, T> Result<S, F>.mapFailure(transform: (F) -> T): Result<S, T> = xmap({ it }, transform)
+
+inline fun <S, F> Result<S, F>.handleFailure(handle: (F) -> Nothing): S = when (this) {
+    is Success -> value
+    is Failure -> handle(reason)
+}
+
+inline fun <S, F, T> Result<S, F>.fold(success: (S) -> T, failure: (F) -> T) = when (this) {
+    is Success -> success(value)
+    is Failure -> failure(reason)
+}
 
 inline fun <S, F, SS, FF> Result<S, F>.xmap(
     success: (S) -> SS,

@@ -14,6 +14,7 @@ import dev.munky.roguelike.server.item.RogueItem
 import dev.munky.roguelike.server.player.RoguePlayer
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import net.minestom.server.MinecraftServer
 import net.minestom.server.command.builder.arguments.ArgumentType
 import net.minestom.server.command.builder.suggestion.SuggestionEntry
@@ -31,6 +32,12 @@ fun toggleDebug() = command("debug") {
     playerExecutor { s, _ ->
         val player = s as? RoguePlayer ?: return@playerExecutor
         player.isDebug = !player.isDebug
+    }
+}
+
+fun reloadAssetsCommand() = command("reload") {
+    executor { s, _ ->
+        Roguelike.server().reloadAssets()
     }
 }
 
@@ -95,6 +102,13 @@ fun testDropItem() = command("testDropItem") {
 }
 
 fun testDungeon() = command("testDungeon") {
+    var generationJob: Job? = null
+    argument("stop") {
+        executor { s, _ ->
+            generationJob?.cancel()
+            s.sendMessage("Dungeon generation stopped if one was ongoing.")
+        }
+    }
     argument(ArgumentType.String("roomset_id")) {
         suggest { s, c, suggestion ->
             for (set in Roguelike.server().roomSets()) {
@@ -109,7 +123,8 @@ fun testDungeon() = command("testDungeon") {
                 t.printStackTrace()
             }
             val roomset = Roguelike.server().roomSets()[roomsetId]!!
-            ctx.launch {
+            generationJob?.cancel()
+            generationJob = ctx.launch {
                 val dungeon = Dungeon.create(roomset, listOf(s as RoguePlayer))
             }
         }

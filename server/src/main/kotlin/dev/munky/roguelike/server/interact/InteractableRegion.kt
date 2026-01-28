@@ -63,12 +63,18 @@ interface Region {
 
         val result = LongArray(chunksX * chunksZ)
         var i = 0
-        for (x in minChunkX..maxChunkX) {
-            for (z in minChunkZ..maxChunkZ) {
-                result[i++] = CoordConversion.chunkIndex(x, z)
+        repeat(maxChunkX - minChunkX) { dx ->
+            repeat(maxChunkZ - minChunkZ) { dz ->
+                result[i++] = CoordConversion.chunkIndex(minChunkX + dx, minChunkZ + dz)
             }
         }
         return result
+//        for (x in minChunkX..maxChunkX) {
+//            for (z in minChunkZ..maxChunkZ) {
+//                result[i++] = CoordConversion.chunkIndex(x, z)
+//            }
+//        }
+//        return result
     }
 
     data class Sphere(val center: Vector3dc, val radius: Double) : Region {
@@ -266,9 +272,7 @@ interface InteractableRegion {
                     delay(delay)
                     for (instance in MinecraftServer.getInstanceManager().instances) {
                         val container = instance as? InteractableRegionContainer ?: continue
-                        val areas = synchronized(container.areas) {
-                            container.areas.toList()
-                        }
+                        val areas = container.areas.toList()
                         for (a in areas) {
                             delay(delay)
                             val shape = a.region
@@ -364,7 +368,7 @@ data class InteractableRegionImpl(
 }
 
 interface InteractableRegionContainer {
-    val areas: HashSet<InteractableRegion>
+    val areas: MutableSet<InteractableRegion>
 
     fun createArea(b: InteractableRegion.Dsl.() -> Unit)
 }

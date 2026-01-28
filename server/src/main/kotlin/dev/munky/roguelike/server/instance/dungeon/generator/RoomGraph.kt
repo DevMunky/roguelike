@@ -33,12 +33,28 @@ class Tree<T: Any>(
     }
 
     /**
+     * Clears every node _except_ the root.
+     */
+    fun clear() {
+        nodes.clear()
+        nodes[root.value] = root
+    }
+
+    /**
      * Removes the node and all of its children recursively.
      */
     fun removeNode(node: Node) {
+        // Detach from parent first to keep the tree consistent
+        node.parent?.children?.remove(node)
+
+        // Remove this node and all descendants from the index map
         nodes.remove(node.value)
-        for (child in node.children)
+
+        val childrenCopy = node.children
+        for (child in childrenCopy) {
             removeNode(child)
+        }
+        node.children.clear()
     }
 
     fun <S : Any> map(transform: (parent: T?, value: T) -> S) : Tree<S> {

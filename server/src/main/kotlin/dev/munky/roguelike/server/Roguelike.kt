@@ -154,15 +154,27 @@ class Roguelike private constructor() {
      * Cannot modify [net.minestom.server.ServerFlag] beyond this point.
      */
     fun init(auth: Auth) {
+        MinecraftServer.LOGGER.info("Starting Roguelike.")
         mc = MinecraftServer.init(auth)
         ourInit()
         minecraftInit()
     }
 
-    fun ourInit() = runBlocking {
-        Interactable.initialize()
-        RogueItem.initialize()
-        RogueInstance.initialize()
+    fun reloadAssets() {
+        ourInit(true)
+    }
+
+    fun ourInit(assetsOnly: Boolean = false) = runBlocking {
+        if (!assetsOnly) {
+            Interactable.initialize()
+            RogueItem.initialize()
+            RogueInstance.initialize()
+            Runtime.getRuntime().addShutdownHook(Thread {
+                runBlocking {
+                    accounts().save()
+                }
+            })
+        }
         withContext(Dispatchers.IO) {
             accounts().load()
             modifiers().load()
@@ -170,11 +182,6 @@ class Roguelike private constructor() {
             roomSets().load()
             enemies().load()
         }
-        Runtime.getRuntime().addShutdownHook(Thread {
-            runBlocking {
-                accounts().save()
-            }
-        })
     }
 
     fun minecraftInit() {
@@ -224,6 +231,7 @@ class Roguelike private constructor() {
             s.sendMessage("Unknown command '$c'.".asComponent())
         }
         MinecraftServer.getCommandManager().register(stopCommand())
+        MinecraftServer.getCommandManager().register(reloadAssetsCommand())
         MinecraftServer.getCommandManager().register(helpCommand())
         MinecraftServer.getCommandManager().register(toggleDebug())
 

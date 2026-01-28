@@ -21,18 +21,17 @@
     "roguelike:room_connections": {
       "type": "room_pool",
       "rooms": {
-        "layout/hallway/door": 1,
         "layout/hallway/junction": 1,
-        "layout/hallway/left": 1,
-        "layout/hallway/right": 1,
-        "layout/hallway/straight": 1
+        "layout/hallway/left": 1.7,
+        "layout/hallway/right": 1.7,
+        "layout/hallway/straight": 2
       }
     },
     "roguelike:rooms": {
       "type": "room_pool",
       "rooms": {
         "layout/room/big": 2,
-        "layout/room/small_loot": 0.4,
+        "layout/room/small_loot": 0.8,
         "layout/room/drop": 1
       }
     },
