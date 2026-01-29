@@ -4,6 +4,14 @@
   "rooms": {
     "layout/root": { "type": "normal" },
 
+    "layout/huge": {
+      "type": "multipart",
+      "structures": [
+        [ "layout/huge/1", "layout/huge/2" ],
+        [ "layout/huge/3", "layout/huge/4" ]
+      ]
+    },
+
     "layout/hallway/door": { "type": "normal" },
     "layout/hallway/junction": { "type": "normal" },
     "layout/hallway/left": { "type": "normal" },
@@ -32,7 +40,7 @@
       "rooms": {
         "layout/room/big": 2,
         "layout/room/small_loot": 0.8,
-        "layout/room/drop": 1
+        "layout/room/drop": 10
       }
     },
     "roguelike:hallways": {

@@ -1,9 +1,10 @@
 package dev.munky.roguelike.server.instance.dungeon.generator
 
 import dev.munky.roguelike.common.logger
-import dev.munky.roguelike.server.instance.dungeon.roomset.ConnectionFeature
+import dev.munky.roguelike.server.instance.dungeon.roomset.feature.ConnectionFeature
 import dev.munky.roguelike.server.instance.dungeon.roomset.Pool
-import dev.munky.roguelike.server.instance.dungeon.roomset.RoomBlueprint
+import dev.munky.roguelike.server.instance.dungeon.roomset.feature.JigsawData
+import dev.munky.roguelike.server.instance.dungeon.roomset.room.RoomBlueprint
 import dev.munky.roguelike.server.interact.Region
 import net.hollowcube.schem.util.Rotation
 import net.minestom.server.coordinate.BlockVec
@@ -15,14 +16,15 @@ import kotlin.collections.plusAssign
 open class CandidateSolver(
     minY: Int?,
     maxY: Int?,
-    val stats: Generator.Stats?,
 ) {
-    val spatialRegion = SpatialRegion(minY, maxY, stats)
+    var stats: Generator.Stats? = null
+    val spatialRegion = SpatialRegion(minY, maxY)
     /**
      * Called just before generation starts.
      */
-    open fun ensureReady() {
-        spatialRegion.ensureReady()
+    open fun ensureReady(stats: Generator.Stats? = null) {
+        this.stats = stats
+        spatialRegion.ensureReady(stats)
     }
 
     fun computeCandidates(
@@ -39,7 +41,7 @@ open class CandidateSolver(
         // For each room in the sampled blueprints
         for ((roomId, weight) in hostPool.entries.elements) {
             var hasAnyConnection = false
-            val bp = owner.blueprint.roomset.rooms[roomId] ?: continue
+            val bp = owner.blueprint.roomSet.rooms[roomId] ?: continue
 
             // for each possible rotation
             for (rot in Rotation.entries/*.shuffled(random)*/) {
@@ -79,13 +81,13 @@ open class CandidateSolver(
     protected fun computeCandidate(
         owner: PlannedRoom,
         rotation: Rotation,
-        blueprint: RoomBlueprint,
+        blueprint: RoomBlueprint<*>,
         hostConnection: ConnectionFeature,
         childConnection: ConnectionFeature,
         weight: Double,
     ) : CandidateResult? {
         stats?.candidatesTried++
-        val pos = owner.computeCandidatePosition(hostConnection, childConnection)
+        val pos = JigsawData.getAlignedPosition(owner.position, hostConnection, childConnection)
         val region = blueprint.boundsWith(pos, rotation)
         val slightlySmallerBounds = region.expand(-0.05)
 
@@ -109,10 +111,10 @@ open class CandidateSolver(
 
     // Result container passed from worker to owner
     class CandidateResult(
-        val blueprint: RoomBlueprint,
+        val blueprint: RoomBlueprint<*>,
         val position: BlockVec,
         val rotation: Rotation,
-        val bounds: Region = blueprint.boundsWith(position, rotation),
+        val bounds: Region,
 
         val weight: Double,
         val connectedToParentVia: ConnectionFeature

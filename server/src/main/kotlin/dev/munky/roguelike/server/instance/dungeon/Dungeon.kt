@@ -11,14 +11,10 @@ import dev.munky.roguelike.server.enemy.Enemy
 import dev.munky.roguelike.server.enemy.Enemy.Source
 import dev.munky.roguelike.server.instance.RogueInstance
 import dev.munky.roguelike.server.instance.dungeon.generator.BacktrackingGenerator
-import dev.munky.roguelike.server.instance.dungeon.generator.CandidateSolver
 import dev.munky.roguelike.server.instance.dungeon.generator.GenerationDebug
 import dev.munky.roguelike.server.instance.dungeon.generator.GenerationOrchestrator
-import dev.munky.roguelike.server.instance.dungeon.generator.Generator
-import dev.munky.roguelike.server.instance.dungeon.generator.SpatialRegion
-import dev.munky.roguelike.server.instance.dungeon.generator.PlannedRoom
 import dev.munky.roguelike.server.instance.dungeon.generator.Tree
-import dev.munky.roguelike.server.instance.dungeon.roomset.RoomBlueprint
+import dev.munky.roguelike.server.instance.dungeon.roomset.room.RoomBlueprint
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomFeatures
 import dev.munky.roguelike.server.instance.dungeon.roomset.RoomSet
 import dev.munky.roguelike.server.instance.town.TownInstance.Companion.TOWN_DIMENSION_KEY
@@ -86,14 +82,12 @@ class Dungeon private constructor(
      * Generate, the rooms, then paste them in the world and initialize appropriately.
      */
     private suspend fun initialize() {
-        val stats = Generator.Stats()
         val debug = GenerationDebug(this)
         val orchestrator = GenerationOrchestrator(
             //debug = debug,
+            doStats = true,
             roomset = roomset,
-            random = Random(System.nanoTime()).asJavaRandom(),
             generatorSupplier = ::BacktrackingGenerator,
-            stats = stats
         )
 
         LOGGER.info("Generating roomset '${roomset.id}' for a dungeon.")
@@ -102,6 +96,7 @@ class Dungeon private constructor(
             throw RuntimeException("Generation failed unexpectedly: $it")
         }
 
+        LOGGER.info("Generation stats: ${orchestrator.stats}")
         LOGGER.info("Committing plan for roomset '${roomset.id}'.")
         for (chunk in chunks) {
             chunk.reset()
@@ -109,12 +104,17 @@ class Dungeon private constructor(
         }
         // time for packets to arrive.
         delay(50)
-        rooms = commitPlan(planTree)
+        rooms = planTree.mapAsync { _ ->
+            createRoom(blueprint, position, rotation)
+        }
         LOGGER.info("Done generating.")
     }
 
+    /**
+     * Create an in-world dungeon room from a planned room.
+     */
     suspend fun createRoom(
-        bp: RoomBlueprint,
+        bp: RoomBlueprint<*>,
         at: BlockVec,
         rotation: Rotation
     ): Room {
@@ -128,19 +128,9 @@ class Dungeon private constructor(
         return room
     }
 
-    /**
-     * Paste room in the world and initialize it, then reference connections appropriately.
-     */
-    private suspend fun commitPlan(tree: Tree<PlannedRoom>): Tree<Room> {
-        val realTree = tree.mapAsync { _ ->
-            createRoom(blueprint, position, rotation)
-        }
-        return realTree
-    }
-
     data class Room(
         val dungeon: Dungeon,
-        val blueprint: RoomBlueprint,
+        val blueprint: RoomBlueprint<*>,
         val features: RoomFeatures,
         val position: BlockVec,
         /**

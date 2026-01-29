@@ -6,6 +6,10 @@ import net.minestom.server.instance.block.Block
 
 /**
  * Rotates `orientation` as well as `facing` and fence properties.
+ *
+ * The resulting bytecode is quite large as most function calls are inlined to reduce lambda allocations.
+ *
+ * Since all logic is done in this function, I would assume lots of it is JITed away if need be.
  */
 fun Block.rotate(rotation: Rotation): Block {
     // fences and stairs ('facing', 'north', 'south', 'east', 'west')
@@ -30,6 +34,9 @@ private inline fun Block.rotateProperty(name: String, rotation: Rotation, rotate
     }
 } ?: this
 
+/**
+ * Primarily rotates rails.
+ */
 private fun rotateShape90(prop: String): String = when(prop) {
     "ascending_north" -> "ascending_east"
     "ascending_south" -> "ascending_west"
@@ -46,6 +53,9 @@ private fun rotateShape90(prop: String): String = when(prop) {
     else -> prop
 }
 
+/**
+ * Primarily rotates signs
+ */
 private fun rotateRotation90(prop: String): String = prop.toIntOrNull()
     ?.plus(4)?.mod(16)?.toString() ?: prop
 
@@ -55,6 +65,9 @@ private fun rotateAxis90(prop: String): String = when (prop) {
     else -> prop
 }
 
+/**
+ * Only jigsaw and crafter blocks have orientation properties to be rotated.
+ */
 private fun rotateOrientation90(prop: String) = when(prop) {
     "north_up" -> "east_up"
     "south_up" -> "west_up"

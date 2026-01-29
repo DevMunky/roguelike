@@ -115,7 +115,7 @@ fun testDungeon() = command("testDungeon") {
                 suggestion.addEntry(SuggestionEntry(set.id))
             }
         }
-        playerExecutor{ s, c ->
+        executor { s, c ->
             s.sendMessage("testing dungeon")
             val roomsetId = c.get<String>("roomset_id")
             val ctx = Dispatchers.Default + CoroutineExceptionHandler { _, t ->
@@ -125,7 +125,8 @@ fun testDungeon() = command("testDungeon") {
             val roomset = Roguelike.server().roomSets()[roomsetId]!!
             generationJob?.cancel()
             generationJob = ctx.launch {
-                val dungeon = Dungeon.create(roomset, listOf(s as RoguePlayer))
+                val list = if (s !is RoguePlayer) listOf() else listOf(s)
+                val dungeon = Dungeon.create(roomset, list)
             }
         }
     }

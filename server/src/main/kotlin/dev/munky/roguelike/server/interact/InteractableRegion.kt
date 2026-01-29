@@ -17,6 +17,7 @@ import net.minestom.server.network.packet.server.play.ParticlePacket
 import net.minestom.server.particle.Particle
 import org.joml.Vector3d
 import org.joml.Vector3dc
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -63,8 +64,8 @@ interface Region {
 
         val result = LongArray(chunksX * chunksZ)
         var i = 0
-        repeat(maxChunkX - minChunkX) { dx ->
-            repeat(maxChunkZ - minChunkZ) { dz ->
+        repeat(abs(maxChunkX - minChunkX) + 1) { dx ->
+            repeat(abs(maxChunkZ - minChunkZ) + 1) { dz ->
                 result[i++] = CoordConversion.chunkIndex(minChunkX + dx, minChunkZ + dz)
             }
         }

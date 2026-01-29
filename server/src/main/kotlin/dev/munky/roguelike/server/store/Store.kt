@@ -7,12 +7,15 @@ import kotlin.io.path.nameWithoutExtension
 
 sealed interface IStore<T : Any> : Iterable<T> {
     operator fun get(key: Key): T?
-    operator fun get(value: String): T? = get(Key.key(namespace(), value))
+    operator fun get(value: String): T? = get(keyFrom(value))
 
     fun getOrThrow(key: Key): T = get(key) ?: error("No entry with key '$key' exists in '${id()}'.")
+    fun getOrThrow(value: String): T = getOrThrow(keyFrom(value))
 
     fun namespace() = this::class.simpleName!!.snakeCase()
     fun id() = Key.key("store:${namespace()}")
+
+    fun keyFrom(value: String) : Key = Key.key(namespace(), value)
 }
 
 sealed interface IResourceStore<T : Any> : IStore<T> {

@@ -1,0 +1,39 @@
+package dev.munky.roguelike.server.instance.dungeon.roomset.feature
+
+import dev.munky.roguelike.server.Roguelike
+import dev.munky.roguelike.server.instance.dungeon.roomset.Pool
+import net.minestom.server.coordinate.BlockVec
+import net.minestom.server.coordinate.Point
+import net.minestom.server.instance.block.Block
+import net.minestom.server.utils.Direction
+
+data class ConnectionFeature(
+    override val name: String,
+    override val poolName: String,
+    val pool: Pool?,
+    override val finalBlock: Block,
+
+    override val position: BlockVec,
+    override val direction: Direction
+) : JigsawData {
+    override val target: String get() = ID
+
+    companion object {
+        const val ID = "${Roguelike.NAMESPACE}:connection"
+    }
+}
+
+data class RoomJoinFeature(
+    override val name: String,
+    override val poolName: String,
+    override val finalBlock: Block,
+
+    override val position: BlockVec,
+    override val direction: Direction
+): JigsawData {
+    override val target: String get() = ID
+
+    companion object {
+        const val ID = "${Roguelike.NAMESPACE}:room_join"
+    }
+}

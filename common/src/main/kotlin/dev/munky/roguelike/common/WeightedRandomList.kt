@@ -12,7 +12,9 @@ class WeightedRandomList<T>() : Collection<T> {
     private inner class Item(
         val value: T,
         val weight: Double
-    )
+    ) {
+        override fun toString(): String = "Item(v=$value, w=$weight)"
+    }
 
     private var _elements: MutableList<Item> = ArrayList<Item>()
 
@@ -48,5 +50,9 @@ class WeightedRandomList<T>() : Collection<T> {
         }
 
         throw NoSuchElementException()
+    }
+
+    override fun toString(): String {
+        return _elements.toString()
     }
 }
